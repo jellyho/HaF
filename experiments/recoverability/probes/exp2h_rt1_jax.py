@@ -1,32 +1,29 @@
-"""Stage 1 (JAX): RT-1-style real VLA on fractal — does a LOW-recoverability aux improve OOD generalization on a
-GENUINE, VLA-faithful setup? All-JAX so it lines up with JAX-based pi0.5 (openpi) later.
+"""Stage 1 (JAX): RT-1-style backbone + FLOW-MATCHING action loss (pi0/pi0.5/SmolVLA style), VLA-faithful.
 
-VLA-faithful choices (per user, 2026-08-02): NO embedding cache — encode images DYNAMICALLY in the forward pass;
-TRAIN the vision encoder (not frozen). The AHA aux is therefore SELF-PREDICTIVE (SPR/BYOL/DINO-WM style): predict
-the FUTURE frame's representation computed ONLINE by the SAME trainable backbone, with a stop-gradient target. No
-frozen DINO, no cache.
+Backbone: RT-1 recipe (TRAINABLE image encoder -> FiLM(language) -> TokenLearner -> Transformer -> tokens).
+Action objective: FLOW MATCHING on the continuous action chunk (not discrete bins).
+AHA aux: predict the future frame's embedding from a FROZEN pretrained encoder (DINOv2), computed ONLINE (no cache).
+Rationale (user): we don't want to LEARN a good image representation (so not SPR/BYOL/DINO-WM self-prediction) — we
+want a stable, meaningful, low-recoverability grounding TARGET that helps VLA training. A fixed encoder gives that;
+computing it online (per batch) keeps it VLA-faithful (no embedding cache) while the VLA's OWN encoder is trained.
 
-Arms (same RT-1 backbone + RT-1/OpenVLA 256-bin action objective):
-  BC   : bin256 action cross-entropy only.
-  AHA  : BC + self-predictive aux (predict stop-grad(backbone(future_frame)) from the current representation).
-Report: OOD generalization = action R^2 on held-out task clusters (bins decoded to continuous), per arm.
-
-Data: outputs/cache/transitions_fractal.npz (Ft + Ffl raw frames, act_chunk, instr). Only RAW FRAMES are read; all
-embeddings are computed online. Language = MiniLM (torch, CPU, one-time). Run in .venv.
-env: SEED, EPOCHS(10), SUBN(6000), AUX(1=AHA,0=BC), LAMBDA(1.0), SMOKE(1=synthetic tiny).
+Arms (same backbone):  BC = flow-matching action only.   AHA = BC + predict frozen-DINO(future frame).
+Report: OOD generalization = action R^2 on held-out task clusters (flow-sampled), per arm.
+Data: outputs/cache/transitions_fractal.npz (Ft + Ffl RAW frames, act_chunk, instr). Language = MiniLM (torch CPU).
+env: SEED, EPOCHS(10), SUBN(6000), AUX(1|0), LAMBDA(1.0), SMOKE(1). Run in .venv.
 """
 import os, numpy as np, jax, jax.numpy as jnp, flax.linen as nn, optax
 import sys; sys.path.insert(0, "/data5/jellyho/Hindsight/HaF/experiments/recoverability/experts")
-from rt1_vla_jax import RT1BackboneJAX, BinActionHeadJAX
+from rt1_vla_jax import RT1BackboneJAX
 
 OUT = "/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs"
 SEED = int(os.environ.get("SEED", 0)); EPOCHS = int(os.environ.get("EPOCHS", 10))
 SUBN = int(os.environ.get("SUBN", 6000)); AUX = int(os.environ.get("AUX", 1))
 LAMBDA = float(os.environ.get("LAMBDA", 1.0)); SMOKE = int(os.environ.get("SMOKE", 0))
-BINS = 256; ADIM = 105; LANGD = 384; DMODEL = 512
+ADIM = 105; LANGD = 384; DMODEL = 512
 rng = np.random.default_rng(SEED)
 
-# ---------- data (RAW FRAMES ONLY; embeddings computed online) ----------
+# ---------- data (RAW FRAMES ONLY; embeddings online) ----------
 if SMOKE:
     N = 240
     Ft = rng.integers(0, 255, (N, 224, 224, 3), np.uint8); Ffl = rng.integers(0, 255, (N, 224, 224, 3), np.uint8)
@@ -35,7 +32,7 @@ if SMOKE:
 else:
     _d = np.load(f"{OUT}/cache/transitions_fractal.npz", allow_pickle=True)
     N0 = len(_d["Ft"]); sel = rng.permutation(N0)[:SUBN] if SUBN and SUBN < N0 else np.arange(N0)
-    Ft = _d["Ft"][sel]; Ffl = _d["Ffl"][sel]                      # current + far-future RAW frames
+    Ft = _d["Ft"][sel]; Ffl = _d["Ffl"][sel]
     act = _d["act_chunk"][sel].reshape(len(sel), -1).astype(np.float32); g = _d["ep_id"][sel]
     import torch
     from transformers import AutoTokenizer, AutoModel
@@ -52,72 +49,107 @@ else:
 
 N = len(Ft)
 from sklearn.cluster import KMeans
-eps = np.unique(g); ep_lang = np.stack([lang[g == e].mean(0) for e in eps])
+eps_u = np.unique(g); ep_lang = np.stack([lang[g == e].mean(0) for e in eps_u])
 cl = KMeans(8, n_init=5, random_state=SEED).fit_predict(ep_lang); ood = set(np.argsort(np.bincount(cl))[:3].tolist())
-epi = {e: i for i, e in enumerate(eps)}; te = np.array([cl[epi[e]] in ood for e in g]); tr = ~te
+epi = {e: i for i, e in enumerate(eps_u)}; te = np.array([cl[epi[e]] in ood for e in g]); tr = ~te
 tr_idx = np.where(tr)[0]; te_idx = np.where(te)[0]
-lo = np.percentile(act[tr_idx], 1, 0); hi = np.percentile(act[tr_idx], 99, 0)
-bins = np.clip(((act - lo) / (hi - lo + 1e-8) * BINS).astype(np.int32), 0, BINS - 1)
-centers = lo[:, None] + (np.arange(BINS) + 0.5) / BINS * (hi - lo)[:, None]
+amu, asd = act[tr_idx].mean(0), act[tr_idx].std(0) + 1e-6
+act_n = ((act - amu) / asd).astype(np.float32)
 print(f"N={N} tr={len(tr_idx)} ood={len(te_idx)} AUX={AUX} lambda={LAMBDA} SMOKE={SMOKE}", flush=True)
 
 MEAN = jnp.array([0.485, 0.456, 0.406]); STD = jnp.array([0.229, 0.224, 0.225])
-def norm(x): return (jnp.asarray(x, jnp.float32) / 255.0 - MEAN) / STD
-def prep(idx): return norm(Ft[idx]), norm(Ffl[idx]), jnp.asarray(lang[idx]), jnp.asarray(bins[idx])
+def norm(x): return (jnp.asarray(x, jnp.float32) / 255.0 - MEAN) / STD          # NHWC, ImageNet norm
 
-# ---------- model: shared trainable backbone, called twice (current + future) ----------
-class RT1SelfPred(nn.Module):
+# ---------- FROZEN target encoder (online, no cache): DINOv2 embedding of the future frame ----------
+AUXTGT_DIM = 384
+if SMOKE:
+    _W = jax.random.normal(jax.random.PRNGKey(7), (3 * 14 * 14, AUXTGT_DIM)) * 0.02   # deterministic frozen stub
+    def dino_embed(nhwc):
+        B = nhwc.shape[0]; x = jax.image.resize(nhwc, (B, 14, 14, 3), "linear").reshape(B, -1)
+        return jax.lax.stop_gradient(x @ _W)
+else:
+    from transformers import FlaxDinov2Model
+    _dino = FlaxDinov2Model.from_pretrained("facebook/dinov2-small", from_pt=True)
+    @jax.jit
+    def dino_embed(nhwc):                                                        # frozen, online
+        nchw = jnp.transpose(nhwc, (0, 3, 1, 2))
+        return jax.lax.stop_gradient(_dino(pixel_values=nchw).last_hidden_state[:, 0])
+
+def time_emb(t, dim=64):                                          # t [B,1] -> [B,dim]
+    half = dim // 2; fr = jnp.exp(-jnp.log(10000.0) * jnp.arange(half) / half)
+    a = t * fr[None]; return jnp.concatenate([jnp.cos(a), jnp.sin(a)], -1)
+
+
+class FlowActionHead(nn.Module):
+    adim: int
+    @nn.compact
+    def __call__(self, x_t, t, cond):                            # x_t[B,adim] t[B,1] cond[B,d] -> velocity[B,adim]
+        h = jnp.concatenate([x_t, cond, time_emb(t, 64)], -1)
+        h = nn.gelu(nn.Dense(512)(h)); h = nn.gelu(nn.Dense(512)(h))
+        return nn.Dense(self.adim)(h)
+
+
+class RT1Flow(nn.Module):
     def setup(self):
         self.bb = RT1BackboneJAX(d_model=DMODEL, k_tokens=8, depth=4)
-        self.binhead = BinActionHeadJAX(n_dims=ADIM, bins=BINS)
-        self.pred = nn.Dense(DMODEL)                              # self-predictive predictor head
-    def __call__(self, im, lng, im_fut):
-        tok = self.bb(im, lng)
-        logits = self.binhead(tok)
-        cur = tok.mean(1)
-        fut = jax.lax.stop_gradient(self.bb(im_fut, lng).mean(1))  # online future rep, stop-grad target
-        return logits, self.pred(cur), fut
-    def act_logits(self, im, lng):
-        return self.binhead(self.bb(im, lng))
+        self.flow = FlowActionHead(ADIM)
+        self.pred = nn.Dense(AUXTGT_DIM)                          # predicts the frozen-DINO future embedding
+    def __call__(self, im, lng, x_t, t):                         # training: velocity + aux prediction
+        cond = self.bb(im, lng).mean(1)
+        return self.flow(x_t, t, cond), self.pred(cond)
+    def cond(self, im, lng): return self.bb(im, lng).mean(1)
+    def vel(self, x_t, t, cond): return self.flow(x_t, t, cond)
 
-model = RT1SelfPred()
+model = RT1Flow()
 key = jax.random.PRNGKey(SEED)
-im0, imf0, ln0, _ = prep(tr_idx[:2]); params = model.init(key, im0, ln0, imf0)
+im0, ln0 = norm(Ft[tr_idx[:2]]), jnp.asarray(lang[tr_idx[:2]])
+params = model.init(key, im0, ln0, jnp.zeros((2, ADIM)), jnp.zeros((2, 1)))
 tx = optax.adamw(3e-4, weight_decay=1e-2); opt_state = tx.init(params)
 
 @jax.jit
-def train_step(params, opt_state, im, lng, imf, bn):
+def train_step(params, opt_state, key, im, lng, a, fut):
+    k1, k2 = jax.random.split(key)
+    epsn = jax.random.normal(k1, a.shape); t = jax.random.uniform(k2, (a.shape[0], 1))
+    x_t = (1 - t) * epsn + t * a
     def L(p):
-        logits, ap, fut = model.apply(p, im, lng, imf)
-        ce = -jnp.take_along_axis(jax.nn.log_softmax(logits, -1), bn[..., None], -1).mean()
+        vel, ap = model.apply(p, im, lng, x_t, t)
+        fm = ((vel - (a - epsn)) ** 2).mean()
         aux = ((ap - fut) ** 2).mean()
-        return ce + (LAMBDA * aux if AUX else 0.0), (ce, aux)
-    (l, (ce, aux)), g = jax.value_and_grad(L, has_aux=True)(params)
+        return fm + (LAMBDA * aux if AUX else 0.0), (fm, aux)
+    (l, (fm, aux)), g = jax.value_and_grad(L, has_aux=True)(params)
     upd, opt_state = tx.update(g, opt_state, params)
-    return optax.apply_updates(params, upd), opt_state, ce, aux
+    return optax.apply_updates(params, upd), opt_state, fm, aux
 
 BS = 32 if SMOKE else 64
 for ep in range(EPOCHS):
     p = rng.permutation(tr_idx)
     for i in range(0, len(p), BS):
-        b = p[i:i+BS]; im, imf, lng, bn = prep(b)
-        params, opt_state, ce, aux = train_step(params, opt_state, im, lng, imf, bn)
+        b = p[i:i+BS]; key, sk = jax.random.split(key)
+        fut = dino_embed(norm(Ffl[b])) if AUX else jnp.zeros((len(b), AUXTGT_DIM))   # frozen DINO, ONLINE
+        params, opt_state, fm, aux = train_step(params, opt_state, sk, norm(Ft[b]), jnp.asarray(lang[b]), jnp.asarray(act_n[b]), fut)
     if ep % 3 == 0 or ep == EPOCHS - 1:
-        print(f"  ep{ep} CE={float(ce):.3f} auxMSE={float(aux):.3f}", flush=True)
+        print(f"  ep{ep} flow={float(fm):.3f} auxMSE={float(aux):.3f}", flush=True)
 
-# ---------- eval: OOD action R^2 (decode bins) ----------
+# ---------- eval: flow-sample action, OOD R^2 ----------
 @jax.jit
-def logits_fn(params, im, lng): return model.apply(params, im, lng, method=RT1SelfPred.act_logits)
+def cond_fn(params, im, lng): return model.apply(params, im, lng, method=RT1Flow.cond)
+@jax.jit
+def step_fn(params, x, t, cond): return model.apply(params, x, t, cond, method=RT1Flow.vel)
+def sample(params, cond, key, K=10, S=8):
+    B = cond.shape[0]; c = jnp.repeat(cond, S, 0); x = jax.random.normal(key, (B * S, ADIM))
+    for k in range(K):
+        t = jnp.full((B * S, 1), k / K); x = x + (1.0 / K) * step_fn(params, x, t, c)
+    return x.reshape(B, S, ADIM).mean(1)
 def action_r2(idx):
-    preds = []
+    preds = []; kk = jax.random.PRNGKey(123)
     for i in range(0, len(idx), 128):
-        b = idx[i:i+128]; lg = logits_fn(params, norm(Ft[b]), jnp.asarray(lang[b]))
-        preds.append(np.asarray(lg.argmax(-1)))
-    pb = np.concatenate(preds); yhat = np.stack([centers[d][pb[:, d]] for d in range(ADIM)], 1)
-    Y = act[idx]; mu = act[tr_idx].mean(0)
+        b = idx[i:i+128]; kk, sk = jax.random.split(kk)
+        cond = cond_fn(params, norm(Ft[b]), jnp.asarray(lang[b]))
+        preds.append(np.asarray(sample(params, cond, sk)))
+    yhat = np.concatenate(preds) * asd + amu; Y = act[idx]; mu = act[tr_idx].mean(0)
     return 1 - ((yhat - Y) ** 2).mean() / (((Y - mu) ** 2).mean() + 1e-9)
 
 res = dict(seed=SEED, aux=AUX, lam=LAMBDA, gen_ood=float(action_r2(te_idx)))
-print(f"RESULT arm={'AHA' if AUX else 'BC'}  OOD action R2 = {res['gen_ood']:+.4f}", flush=True)
+print(f"RESULT arm={'AHA' if AUX else 'BC'}  OOD action R2 (flow) = {res['gen_ood']:+.4f}", flush=True)
 if not SMOKE:
     import json; json.dump(res, open(f"{OUT}/exp2h_rt1_jax_a{AUX}_s{SEED}.json", "w"), indent=1); print("SAVED", flush=True)
