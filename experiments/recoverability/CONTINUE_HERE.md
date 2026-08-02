@@ -114,6 +114,35 @@ story; update `M1_RESULTS.md`, `AHA_MASTER.md`, dashboard. If no signal, demote 
 4. Verify all 2025/26 arXiv ids before submission (esp. Voita-Titov → cite ACL Anthology; Hejna 2306.12554 OK).
    See `CITATIONS_THREATS.md` (biggest threat = "assembly", defused there).
 
+## 6b. Experts + NTP + dynamic KI (added 2026-08-02, mirroring real VLA training)
+New reusable modules in `experts/` (all CPU-smoked; scale via d_model/depth/nhead → mini to pi0.5):
+- **`experts/latent_expert.py` — `LatentPredictionExpert`**: a future-frame-LATENT expert, analogous to the
+  pi0/pi0.5 flow-matching ACTION expert. Cross-attends the backbone features; heads = `flow` (flow-matching, same
+  interface as the action expert: `flow_loss`/`sample`), `mse` (continuous embedding regression), `vq` (discrete
+  codebook cross-entropy = VQ-image / discrete frame tokens). This is the AHA low-recoverability aux as a proper
+  expert at pi0.5 scale. Gradients ground the backbone; detach the ctx to apply KI.
+- **`experts/token_ntp_expert.py` — `TokenNTPExpert`** (generic): autoregressive NTP over ANY discrete token
+  stream, cross-attending the backbone (causal self-attn + cross-attn + LM head). Serves BOTH: ACTION via the
+  **official FAST tokenizer** (`AutoProcessor("physical-intelligence/fast", trust_remote_code=True)`, DCT+BPE,
+  vocab 2048, near-lossless) = OpenVLA/pi0.5-FAST style, AND TEXT objectives (instruction/subtask/CoT) via a text
+  tokenizer = RT-2/ECoT style. Recoverability the "real VLA" way: `R = 1 - CE_val/CE_marg`.
+- **`probes/exp2h_dynki.py` — dynamic KI**: release the BC-head→backbone stop-grad when the BC head's gradient into
+  the backbone has DECAYED (EMA < RELFRAC×peak), i.e. once the flow expert warmed up — vs fixed tau. Logs release epoch.
+- **`probes/exp2h_actiontok.py` (+ `slurm/actiontok.sbatch`)**: measures where each TARGET FORM sits on the
+  recoverability axis — action {cont-MSE, FAST-NTP, OpenVLA-256bin-NTP} + instruction {embed, text-NTP}, one shared
+  backbone. Runs in **`.venv`** (superset: torch+transformers+sklearn+FAST). SEEDS/EPOCHS/SUBN env.
+
+**Data plan (decided 2026-08-02): (a) then (b).**
+- **(a) now** — run the new expert/NTP experiments on the existing **16k cache** (recoverability rankings are stable
+  across 4k/8k/16k per R1, so this is scientifically sufficient for the *measurement*). Jobs queued.
+- **(b) next** — scale to bigger/full data with **DYNAMIC DINO**: do NOT pre-cache DINO latents (that caused the
+  98%-disk problem). Hold a frozen DINO-base in-process and encode target frames on-the-fly per batch; input encoder
+  is the trainable DINO-small on raw/JPEG frames. Then only FRAMES are needed (JPEG ~60GB for full, or stream
+  TFRecords) — no latent cache, scales to full 87k. Apply this to `save_policy_dense.py` / a dynamic variant.
+
+Still-open builds: **VQ-image** experiment (diffusers `VQModel` VQGAN → frame codes → `LatentPredictionExpert` vq
+head; diffusers 0.39 confirmed in `.venv`) and wiring the FAST-NTP/latent experts into the full pi0.5 (M2).
+
 ## 7. Doc index
 `AHA_MASTER.md` (status truth) · `PAPER_DRAFT.md` (full prose) · `PAPER_S*.md` (per-section) · `PAPER_OUTLINE.md` ·
 `RECOVERABILITY_MEASUREMENT.md` (R1) · `M1_RESULTS.md` (R3/R4) · `M2_DESIGN.md` · `SURVEY_vla_auxlosses.md` (R7) ·
