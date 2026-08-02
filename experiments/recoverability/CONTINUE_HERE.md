@@ -157,6 +157,18 @@ Instead of jumping to pi0.5, first test the thesis on a genuine but tiny VLA. RT
 Plan: train RT-1 on fractal, eval in SimplerEnv (visual_matching); arms = BC(256-bin) / +low-recov latent aux /
 swap action tokenizer {256-bin, FAST, VQ}. First "real VLA architecture x recoverability" check. GPU via slurm.
 
+
+## 6d. POLICY (2026-08-02, user): NO embedding caches — encode online; TRAIN the vision encoder (VLA-faithful)
+Real VLAs encode images in the forward pass (not from a cache) and train the vision encoder end-to-end. So:
+- **No pre-extracted embedding caches** (dino_latents/z_fl are deprecated for new work). Read RAW frames only; encode
+  online. Faster iteration (no extract jobs to wait on).
+- **Vision encoder is TRAINABLE** (not frozen).
+- **AHA aux = SELF-PREDICTIVE** (SPR/BYOL/DINO-WM style): predict the future frame's representation computed ONLINE
+  by the SAME trainable backbone, stop-gradient target. No frozen DINO, no cache. Implemented in
+  `probes/exp2h_rt1_jax.py` (reads Ft+Ffl raw frames from transitions_fractal.npz; everything else online).
+- The `dense_extract` / z_fl 20k cache and the frozen-DINO-base aux target are **SUPERSEDED** by this. (Old torch
+  mini-VLA experiments still use the z_fl cache; new RT-1-JAX line does not.)
+
 ## 7. Doc index
 `AHA_MASTER.md` (status truth) · `PAPER_DRAFT.md` (full prose) · `PAPER_S*.md` (per-section) · `PAPER_OUTLINE.md` ·
 `RECOVERABILITY_MEASUREMENT.md` (R1) · `M1_RESULTS.md` (R3/R4) · `M2_DESIGN.md` · `SURVEY_vla_auxlosses.md` (R7) ·
