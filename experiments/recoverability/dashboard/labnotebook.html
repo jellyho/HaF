@@ -1,0 +1,278 @@
+<title>AHA — 실험 랩노트 (reproduce-grade)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#FAF9F5; --panel:#FFFFFF; --panel2:#F1EEE7; --code:#F4F1EA; --ink:#201E19; --mut:#79746A; --faint:#A69F92;
+    --line:#E5E1D6; --coral:#CF6F53; --teal:#3E8E82; --amber:#BC8A3E; --slate:#5E6B73; --rust:#B4543A; --violet:#7A6A9E;
+    --tealb:#E1EFEC; --amberb:#F3E8CF; --rustb:#F5E2DB; --slateb:#E6EAEC;
+    --mono:"SF Mono",ui-monospace,Menlo,"DejaVu Sans Mono",monospace; --sans:"Helvetica Neue",-apple-system,Segoe UI,Roboto,"DejaVu Sans",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#161410; --panel:#1F1C16; --panel2:#1A1813; --code:#211E17; --ink:#EBE6DA; --mut:#988F80; --faint:#6B6559;
+    --line:#302C24; --coral:#E08767; --teal:#63B3A6; --amber:#D6A860; --slate:#8FA0A9; --rust:#D9765A; --violet:#A192C4;
+    --tealb:#1A2A26; --amberb:#2D2615; --rustb:#301E18; --slateb:#1F272A;
+  }}
+  :root[data-theme="light"]{--bg:#FAF9F5;--panel:#FFFFFF;--panel2:#F1EEE7;--code:#F4F1EA;--ink:#201E19;--mut:#79746A;--faint:#A69F92;--line:#E5E1D6;--coral:#CF6F53;--teal:#3E8E82;--amber:#BC8A3E;--slate:#5E6B73;--rust:#B4543A;--violet:#7A6A9E;--tealb:#E1EFEC;--amberb:#F3E8CF;--rustb:#F5E2DB;--slateb:#E6EAEC;}
+  :root[data-theme="dark"]{--bg:#161410;--panel:#1F1C16;--panel2:#1A1813;--code:#211E17;--ink:#EBE6DA;--mut:#988F80;--faint:#6B6559;--line:#302C24;--coral:#E08767;--teal:#63B3A6;--amber:#D6A860;--slate:#8FA0A9;--rust:#D9765A;--violet:#A192C4;--tealb:#1A2A26;--amberb:#2D2615;--rustb:#301E18;--slateb:#1F272A;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.62;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:0 22px 120px}
+  a{color:var(--coral);text-decoration:none} a:hover{text-decoration:underline}
+  code,kbd{font-family:var(--mono);font-size:.86em} .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  header{padding:54px 0 20px;border-bottom:2px solid var(--ink);margin-bottom:6px}
+  .kick{font-family:var(--mono);font-size:.7rem;letter-spacing:.22em;text-transform:uppercase;color:var(--coral);font-weight:600}
+  h1{font-size:clamp(1.8rem,4.6vw,2.5rem);font-weight:800;letter-spacing:-.025em;line-height:1.08;margin:.35em 0 .28em;text-wrap:balance}
+  .lede{font-size:1.05rem;color:var(--mut);max-width:66ch;margin:0}
+  .meta{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:.68rem;color:var(--faint)}
+  .meta span{border:1px solid var(--line);border-radius:20px;padding:3px 10px}
+  h2{font-size:1.28rem;font-weight:800;letter-spacing:-.01em;margin:2.6em 0 .1em;padding-top:.3em;display:flex;align-items:baseline;gap:10px;text-wrap:balance}
+  h2 .rid{font-family:var(--mono);font-size:.72rem;color:var(--coral);font-weight:700;letter-spacing:.02em}
+  h3{font-size:1.02rem;font-weight:700;margin:1.4em 0 .3em}
+  p{margin:.55em 0} .mut{color:var(--mut)}
+  .lab{display:inline-block;font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:.22em .55em;border-radius:5px;vertical-align:middle}
+  .l-meas{background:var(--tealb);color:var(--teal)} .l-run{background:var(--amberb);color:var(--amber)} .l-pend{background:var(--slateb);color:var(--slate)} .l-art{background:var(--rustb);color:var(--rust)}
+  .exp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 22px 20px;margin:14px 0}
+  .block{margin:14px 0}
+  .block .h{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:7px}
+  .block .h::before{content:"";width:14px;height:2px;background:var(--coral);display:inline-block}
+  .hyp{border-left:3px solid var(--amber);background:var(--amberb);border-radius:0 8px 8px 0;padding:8px 14px}
+  .got{border-left:3px solid var(--teal);background:var(--tealb);border-radius:0 8px 8px 0;padding:8px 14px}
+  .got.pending{border-color:var(--slate);background:var(--slateb)}
+  .got.art{border-color:var(--rust);background:var(--rustb)}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:9px;padding:11px 13px;overflow-x:auto;margin:6px 0;font-family:var(--mono);font-size:.8rem;line-height:1.5}
+  pre .c{color:var(--faint)} pre .k{color:var(--coral)}
+  table{border-collapse:collapse;width:100%;font-size:.84rem;margin:4px 0}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:6px 0}
+  .scroll table{margin:0}
+  th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--line);white-space:nowrap}
+  thead th{font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);background:var(--panel2)}
+  tbody tr:last-child td{border-bottom:none}
+  td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .good{color:var(--teal);font-weight:700}.bad{color:var(--rust);font-weight:700}.flat{color:var(--faint)}
+  .eq{font-family:var(--mono);font-size:.85rem;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:9px 13px;overflow-x:auto;margin:6px 0}
+  ul{margin:.4em 0;padding-left:1.25em}li{margin:.28em 0}
+  .toc{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 20px;margin:16px 0;columns:2;column-gap:26px;font-size:.9rem}
+  @media(max-width:640px){.toc{columns:1}}
+  .toc a{display:block;padding:2px 0;color:var(--ink)} .toc a .rid{font-family:var(--mono);font-size:.7rem;color:var(--coral);margin-right:6px}
+  .foot{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:.78rem;line-height:1.7}
+  .anchor{scroll-margin-top:14px}
+</style>
+<div class="wrap">
+<header>
+  <div class="kick">AHA · 실험 랩노트 · reproduce-grade</div>
+  <h1>Recoverability 실험록: 어떻게 돌렸고, 뭘 기대했고, 실제로 어땠나</h1>
+  <p class="lede">각 실험을 <b>목적 → 가설(기대) → 방법(모델·데이터·loss·split, 코드 참조) → 재현 커맨드 → 실제 결과 → 해석</b>으로.
+     읽기만 해도 재현되도록 정확한 수치·경로·명령을 담았다. 검정=실측, <span class="l-run">RUNNING</span>/<span class="l-pend">PENDING</span>=진행/대기.</p>
+  <div class="meta"><span id="upd">updated 2026-08-02 밤 · 첫 결과 반영</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
+</header>
+
+<div class="toc" id="toc">
+  <a href="#setup"><span class="rid">§0</span>공통 셋업 (env·데이터·모델)</a>
+  <a href="#r1"><span class="rid">R1</span>측정이 답을 뒤집는다 (sign-flip)</a>
+  <a href="#r2"><span class="rid">R2</span>the LAW + recoverability 사다리</a>
+  <a href="#r3"><span class="rid">R3</span>composition (최저 멤버 지배)</a>
+  <a href="#r3b"><span class="rid">R3b</span>count-sweep 아티팩트 → countfix</a>
+  <a href="#r4"><span class="rid">R4</span>Knowledge Insulation</a>
+  <a href="#at"><span class="rid">AT</span>action 토큰화 recoverability</a>
+  <a href="#rt1"><span class="rid">RT1</span>RT-1(JAX) full-data + flow + DINO aux</a>
+  <a href="#concepts"><span class="rid">§A</span>개념 부록 (함수족·동역학·recov vs gen)</a>
+  <a href="#repro"><span class="rid">§B</span>전체 재현 커맨드</a>
+</div>
+
+<!-- SETUP -->
+<h2 id="setup" class="anchor">공통 셋업 <span class="rid">§0 · env · data · model</span></h2>
+<div class="exp">
+<div class="block"><div class="h">환경 (3 venv, /data5/jellyho/Hindsight/)</div>
+<div class="scroll"><table><thead><tr><th>venv</th><th>용도</th><th>핵심 패키지</th></tr></thead><tbody>
+<tr><td class="mono">.venv</td><td>측정/RT-1(JAX)/추출/figure</td><td>torch2.7 · jax0.5 · flax0.10 · transformers4.53 · tf · cv2 · sklearn · diffusers · FAST</td></tr>
+<tr><td class="mono">enc_venv</td><td>exp2h 측정 · 정책서버</td><td>torch · transformers · sklearn · openpi_client · websockets</td></tr>
+<tr><td class="mono">simpler_venv</td><td>SimplerEnv 클라이언트</td><td>SimplerEnv · ManiSkill2 · sapien(vulkan) · tyro</td></tr>
+</tbody></table></div>
+<p class="mut" style="font-size:.85rem">GPU는 <b>slurm 전용</b> (shell에서 직접 GPU 금지). L40S ~6–8GB VRAM이면 충분 — 대기는 VRAM이 아니라 GPU 개수 할당 때문.</p></div>
+
+<div class="block"><div class="h">데이터 — RT-1 / fractal</div>
+<p><code>/data5/jellyho/Hindsight/fractal_rlds/fractal20220817_data/0.1.0</code> — 1024 shard, 112GB, <b>87,212 에피소드</b>. RT-1의 그 데이터셋.
+action 7-d = world_vector(3)+rotation_delta(3)+gripper(1) (<b>delta action</b>). 관측 = 이미지(224²)+언어(instruction). 제어 ~3Hz.</p>
+<p><b>정책(2026-08-02): 임베딩 캐시 없음 → online 인코딩 (실제 VLA처럼).</b> 측정 실험은 기존 sparse 캐시(2k ep→16k transition) 사용;
+RT-1 full-data 라인은 <b>TFRecords를 직접 스트리밍</b>(캐시 0, 전체 87k).</p></div>
+
+<div class="block"><div class="h">모델 A — mini V-L-A (측정 실험용)</div>
+<pre>이미지 → <span class="k">DINOv2-small(학습)</span> ┐
+state(pose7+grip1) ────────┤→ 각 256d 투영 → <span class="k">2-layer Transformer(d=256)</span> → mean-pool → rep(256d)
+instruction → MiniLM(frozen)┘        │
+   rep → <span class="k">flow-matching BC head</span> (15-step action chunk, 105d)   ← 본 과제
+   rep → aux head (objective 타깃 예측)                              ← 실험 대상</pre>
+<p class="mut" style="font-size:.85rem">코드: <code>probes/exp2h_law.py</code> (측정), <code>exp2h_mixki.py</code> (mixing/KI). flow: x_t=(1−t)ε+t·a, target=a−ε, Euler K=20·S=16.</p></div>
+
+<div class="block"><div class="h">모델 B — RT-1 스타일 (JAX, 진짜 아키텍처 테스트)</div>
+<pre>이미지 → <span class="k">EfficientNet/ConvStem(학습)</span> → <span class="k">FiLM(언어)</span> → <span class="k">TokenLearner(K=8)</span> → <span class="k">Transformer</span> → tokens[B,8,512]
+   tokens.mean → <span class="k">flow-matching action</span> (연속 chunk 105d)      ← BC
+   tokens.mean → pred → <span class="k">predict frozen-DINOv2(미래프레임)</span> [online] ← AHA aux (저-recov grounding)</pre>
+<p class="mut" style="font-size:.85rem">코드: <code>experts/rt1_vla_jax.py</code> (backbone), <code>probes/exp2h_rt1_full_jax.py</code> (full-data 스트리밍).
+인코더 <b>학습</b>, aux 타깃 인코더 <b>frozen DINO, online</b>(캐시 0). 전부 continuous(지금 단계). torch 버전: <code>experts/rt1_vla.py</code>.</p></div>
+
+<div class="block"><div class="h">공통 평가 프로토콜 — split 3개</div>
+<div class="scroll"><table><thead><tr><th>split</th><th>정의</th><th>쓰임</th></tr></thead><tbody>
+<tr><td class="mono">fit</td><td>학습 태스크 클러스터</td><td>학습</td></tr>
+<tr><td class="mono">val</td><td>학습 클러스터의 in-dist 15% 홀드아웃</td><td><b>recoverability</b> (aux 타깃 y의 예측 loss)</td></tr>
+<tr><td class="mono">te (OOD)</td><td>held-out 태스크 클러스터 (KMeans on 언어; RT-1은 instruction hash 20%)</td><td><b>generalization</b> (action OOD R²)</td></tr>
+</tbody></table></div>
+<div class="eq">recoverability = 1 − L_val(y)/L_marg(y)   ·   generalization = 1 − MSE_te(action)/MSE_marg   ·   benefit = gen − gen(BC-only)</div></div>
+</div>
+
+<!-- R1 -->
+<h2 id="r1" class="anchor">측정이 답을 뒤집는다 (sign-flip) <span class="rid">R1 · <span class="lab l-meas">MEASURED</span></span></h2>
+<div class="exp">
+<div class="block"><div class="h">목적</div><p>recoverability를 <b>어떤 함수족·어느 시점</b>에 재느냐가 결과를 바꾸는지. 정책이 shortcut을 잡는 방식대로 재야 하는지 검증.</p></div>
+<div class="block"><div class="h">가설 (기대)</div><div class="hyp">정책 함수족 + 학습 동역학으로 재면 <b>recoverability↓ ⇒ generalization↑</b> (음의 상관). frozen linear probe 같은 대리측정은 다른 양을 재서 신호가 약하거나 없을 것. <span class="mut">(실제론 예상보다 강하게 — 부호가 뒤집혔다.)</span></div></div>
+<div class="block"><div class="h">방법</div><p>18개 objective 각각을, 6가지 측정기 × 3 스케일(4k/8k/16k transition) × 3 seed로 recoverability를 재고, 같은 objective를 BC와 co-train했을 때의 OOD action R²(generalization)와 상관. 측정기 = 함수족(linear/MLP/policy) × 시점(asymptotic/dynamics). 부트스트랩 10k CI + permutation p. 선택성 대조 = 타깃 셔플.</p>
+<p class="mut" style="font-size:.85rem">코드 <code>probes/exp2h_law.py</code> → per-objective <code>deep_recoverability</code>·<code>generalization</code>·<code>benefit</code>. 분석 <code>probes/analyze_stats.py</code>.</p></div>
+<div class="block"><div class="h">재현</div><pre><span class="c"># 캐시 준비(1회): stage1(raw+anchor) → stage2(DINOv2-base 인코딩)</span>
+sbatch experiments/recoverability/slurm/prep_scale.sbatch   <span class="c"># .venv</span>
+sbatch experiments/recoverability/slurm/encode.sbatch       <span class="c"># enc_venv</span>
+<span class="c"># 측정 (스케일별)</span>
+for n in 4000 8000 16000; do sbatch --export=ALL,SUBN=$n experiments/recoverability/slurm/exp2h.sbatch; done
+<span class="k">python</span> experiments/recoverability/probes/analyze_stats.py   <span class="c"># CI + perm-p</span></pre></div>
+<div class="block"><div class="h">실제 결과</div>
+<div class="scroll"><table><thead><tr><th>측정기</th><th>함수족·시점</th><th class="n">4k</th><th class="n">8k</th><th class="n">16k</th><th>판정</th></tr></thead><tbody>
+<tr><td>linear probe</td><td class="mut">linear·asym</td><td class="n bad">+.78</td><td class="n bad">+.69</td><td class="n bad">+.62</td><td class="bad">뒤집힘</td></tr>
+<tr><td>MLP probe</td><td class="mut">MLP·asym</td><td class="n flat">+.03</td><td class="n flat">−.34</td><td class="n flat">·</td><td class="flat">불안정</td></tr>
+<tr><td>prequential MDL</td><td class="mut">MLP·dyn</td><td class="n flat">+.42</td><td class="n flat">−.05</td><td class="n flat">·</td><td class="flat">불안정</td></tr>
+<tr><td>end-to-end</td><td class="mut">policy·asym</td><td class="n good">−.66</td><td class="n good">−.64</td><td class="n">−.47</td><td>법칙(16k 약화)</td></tr>
+<tr><td>AULC</td><td class="mut">policy·dyn</td><td class="n good">−.75</td><td class="n good">−.67</td><td class="n good">−.63</td><td class="good">법칙✓</td></tr>
+<tr><td><b>speed@¼</b></td><td class="mut">policy·dyn</td><td class="n good">−.75</td><td class="n good">−.72</td><td class="n good">−.69</td><td class="good">최고✓✓</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> frozen linear probe는 <b>+0.78로 부호가 뒤집힘</b>(가설보다 강한 실패). 정책 함수족+동역학(speed@¼)은 <b>−.75/−.72/−.69, CI 0제외</b>(p≤.003). 선택성 대조 +.167 vs 셔플 −.001. <b>왜:</b> final-pose는 linear-hard(.06)·deep-easy(.92) shortcut; 시각 latent은 linear≈.2·deep≈−.1. linear-decodability ⟂ policy-recoverability.</div></div>
+</div>
+
+<!-- R2 -->
+<h2 id="r2" class="anchor">the LAW + recoverability 사다리 <span class="rid">R2 · <span class="lab l-meas">MEASURED</span></span></h2>
+<div class="exp">
+<div class="block"><div class="h">가설</div><div class="hyp">objective별 recoverability(정책·동역학)가 낮을수록 그걸 co-train한 BC의 OOD 일반화가 높다. <b>단, 저-recov가 노이즈(구조없음)면 예외</b>(신호 바닥).</div></div>
+<div class="block"><div class="h">실제 결과 (fractal 4k, 3seed; BC-only gen=−.080)</div>
+<div class="scroll"><table><thead><tr><th>objective</th><th>type</th><th class="n">R_deep</th><th class="n">benefit</th><th></th></tr></thead><tbody>
+<tr><td>far-past-obs</td><td class="mut">retro</td><td class="n">−.152</td><td class="n good">+.032</td><td class="mut">최저-recov·최고benefit</td></tr>
+<tr><td>initial-obs</td><td class="mut">retro</td><td class="n">−.134</td><td class="n good">+.040</td><td></td></tr>
+<tr><td>far-fut-obs</td><td class="mut">prosp</td><td class="n">−.111</td><td class="n good">+.036</td><td></td></tr>
+<tr><td>cur-action</td><td class="mut">prosp</td><td class="n">−.081</td><td class="n">+.018</td><td class="bad">action=노이즈(단일 delta)</td></tr>
+<tr><td>fut-action</td><td class="mut">prosp</td><td class="n">−.006</td><td class="n">+.018</td><td class="bad">signal-floor</td></tr>
+<tr><td>displacement</td><td class="mut">retro</td><td class="n">+.372</td><td class="n">+.022</td><td></td></tr>
+<tr><td>final-pose</td><td class="mut">prosp</td><td class="n">+.924</td><td class="n bad">−.022</td><td class="bad">shortcut·유일하게 해침</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> Pearson(R_deep, benefit) = <b>−.734</b> (action 제외 <b>−.784</b>). 관측(obs) latent은 저-recov·고benefit(+.03~.04); <b>단일 action은 저-recov지만 benefit 낮음(+.018)</b> — delta action 단일예측은 <b>ill-posed 노이즈</b>라 grounding 신호가 없음(signal floor). → 정교화: "저-recov <b>+ 학습가능 구조</b>"가 조건. <span class="mut">(action은 chunk로 재는 게 맞음; cur-action-chunk=BC. 재측정 예정.)</span></div></div>
+</div>
+
+<!-- R3 -->
+<h2 id="r3" class="anchor">composition: 최저 멤버가 지배 <span class="rid">R3 · <span class="lab l-meas">MEASURED</span> (4k)</span></h2>
+<div class="exp">
+<div class="block"><div class="h">가설</div><div class="hyp">여러 objective를 mix하면, mix의 일반화는 <b>가장 낮은-recoverability(가장 hard) 멤버</b>가 지배한다(min). 평균이 아니라.</div></div>
+<div class="block"><div class="h">방법</div><p>12개 mix(2–3 멤버). 각 mix를 BC와 co-train, mix 일반화를 멤버 recoverability의 min/mean/joint로 예측. <code>probes/exp2h_mixki.py</code> (MIXSET=base).</p></div>
+<div class="block"><div class="h">실제 결과</div>
+<div class="scroll"><table><thead><tr><th>요약통계</th><th class="n">Pearson</th><th class="n">Spearman</th><th>CI 0제외</th></tr></thead><tbody>
+<tr><td><b>min</b></td><td class="n good">−.87</td><td class="n good">−.82</td><td class="good">예 [−.98,−.67]</td></tr>
+<tr><td>joint</td><td class="n">−.85</td><td class="n flat">·</td><td class="mut">예</td></tr>
+<tr><td>mean</td><td class="n flat">·</td><td class="n flat">−.57</td><td class="flat">아니오 (p=.057)</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> min이 지배(−.87, CI 0제외) &gt; mean. <b>hard question 하나가 shortcut mix를 구제:</b> far-past-obs+final-pose → −.033(hard 근처) vs final-pose+initial-pose → −.062. 설계규칙 "hard 하나 넣고 멈춰라".</div></div>
+</div>
+
+<!-- R3b countfix -->
+<h2 id="r3b" class="anchor">"포화·다양성 inert" 아티팩트 → countfix <span class="rid">R3b · <span class="lab l-art">ARTIFACT</span> → <span class="lab l-meas" id="cf-lab">MEASURED</span></span></h2>
+<div class="exp">
+<div class="block"><div class="h">문제 (사용자 지적)</div><div class="got art">저-recov 멤버를 1→6개 쌓았을 때 benefit이 .035→.043→.043→.047→.040→.045로 <b>전부 노이즈(std~.018) 안</b>. "포화"로 보였지만 —</div></div>
+<div class="block"><div class="h">진단 (아티팩트)</div><p>mix가 멤버 타깃 <b>concat을 하나의 선형 head가 mean-MSE로</b> 예측 + BC:aux 1:1 고정 → aux가 backbone에 흘리는 <b>gradient 예산이 멤버수 K와 무관</b>(각 1/K). 포화가 loss 정규화로 <b>강제</b>됨. 다양성 패널도 K=2 고정이라 동일.</p></div>
+<div class="block"><div class="h">가설 (정정 실험)</div><div class="hyp">멤버별 <b>독립 head + loss 합산</b>(각 full weight)하면 K배 압력이 실제로 들어감. SUM(K개 다양한 hard)이 <b>총-weight 고정 MATCHED(1개×K)보다 높으면</b> → 다양한 hard question이 <b>상보적 grounding</b>을 더한다(≠포화). SUM≈MATCHED면 그냥 총 가중치.</div></div>
+<div class="block"><div class="h">방법·재현</div><pre><span class="c"># SUM: K개 독립 head 각 w=1 | MATCHED: 최hard 1개 w=K | MEAN: 옛 concat+mean(아티팩트 재현)</span>
+sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEEDS="0 1 2" EPOCHS=20 SUBN=4000 KMAX=6</span></pre>
+<p class="mut" style="font-size:.85rem">코드 <code>probes/exp2h_countfix.py</code>. 멤버(난이도순 다양): fut-action→far-fut-obs→far-past-obs→near-fut-obs→initial-obs→displacement.</p></div>
+<div class="block"><div class="h">실제 결과</div><div class="scroll"><table><thead><tr><th class="n">K</th><th class="n">SUM (K개 다양)</th><th class="n">MATCHED (1개×K)</th><th class="n">MEAN (옛 아티팩트)</th></tr></thead><tbody>
+<tr><td class="n">1</td><td class="n">−.009±.03</td><td class="n">−.007±.03</td><td class="n">+.001±.04</td></tr>
+<tr><td class="n">2</td><td class="n good">+.005±.03</td><td class="n bad">−.008±.03</td><td class="n">+.012±.03</td></tr>
+<tr><td class="n">3</td><td class="n good">+.018±.02</td><td class="n bad">−.003±.03</td><td class="n">+.009±.04</td></tr>
+<tr><td class="n">4</td><td class="n good">+.007±.03</td><td class="n bad">−.006±.02</td><td class="n">+.025±.04</td></tr>
+<tr><td class="n">5</td><td class="n">−.000±.03</td><td class="n bad">−.017±.03</td><td class="n">+.022±.03</td></tr>
+<tr><td class="n">6</td><td class="n good">+.013±.02</td><td class="n bad">−.002±.03</td><td class="n">+.012±.04</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과 (3seed):</b> <b>SUM &gt; MATCHED가 89%</b> — 같은 총-weight면 <b>다양한 hard question(SUM)이 하나에 몰아준 것(MATCHED)보다 낫다</b> → 상보적 grounding 실재(네 직관 지지, "포화"는 아티팩트 확인). MATCHED(단일×K)는 안 도움/약간 해침 → 한 질문 가중치만 키우면 안 됨. 단 SUM은 K 따라 <b>단조상승 아님</b>(corr +.14, 노이지) → "많을수록"이 아니라 <b>"다양할수록"</b>. 효과크기 ±.01~.02(개별 점은 노이즈 안, 방향 89% 일관). 코드 <code>probes/exp2h_countfix.py</code>.</div></div>
+</div>
+
+<!-- R4 -->
+<h2 id="r4" class="anchor">Knowledge Insulation <span class="rid">R4 · <span class="lab l-meas">MEASURED</span> (4k)</span></h2>
+<div class="exp">
+<div class="block"><div class="h">가설</div><div class="hyp">BC head→backbone stop-grad(insulation)를 걸면, backbone은 aux로만 shaping됨. <b>action-관련 aux만 hard-KI에서 생존</b>하고 action-무관 aux는 action head를 굶길 것. (π0.5가 KI+FAST로 안 무너지는 이유.)</div></div>
+<div class="block"><div class="h">실제 결과 (Δgen vs BC-only)</div>
+<div class="scroll"><table><thead><tr><th>aux</th><th>action-rel</th><th class="n">τ=0</th><th class="n">τ=.5</th><th class="n">τ=1</th></tr></thead><tbody>
+<tr><td>far-past-obs</td><td class="mut">✗</td><td class="n">+.041</td><td class="n">+.035</td><td class="n bad">−.030 굶음</td></tr>
+<tr><td>cur-action</td><td class="mut">✓</td><td class="n">+.028</td><td class="n">+.017</td><td class="n good">+.024</td></tr>
+<tr><td>fut-action</td><td class="mut">✓</td><td class="n">+.021</td><td class="n">+.011</td><td class="n good">+.018</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> hard-KI(τ=1)에서 action-무관(far-past-obs)만 −.030으로 굶고 action-관련은 생존. π0.5의 KI+FAST = 암묵적 KI+AHA. (late-release τ=.5는 joint 대비 이득 없음.) 재현: <code>slurm/exp2h_mixki.sbatch</code>.</div></div>
+</div>
+
+<!-- actiontok -->
+<h2 id="at" class="anchor">action 토큰화별 recoverability <span class="rid">AT · <span class="lab l-meas" id="at-lab">MEASURED</span></span></h2>
+<div class="exp">
+<div class="block"><div class="h">목적·가설</div><div class="hyp">같은 backbone에서 action을 <b>연속(MSE) / FAST-NTP / OpenVLA 256-bin-NTP</b>, instruction을 <b>embedding / text-NTP</b>로 재면 recoverability(R=1−CE_val/CE_marg 또는 1−MSE/MSE)가 어디 앉나. 실제 VLA 방식(discrete NTP)으로 쟀을 때 순위를 봄. (FAST-lite K=16 quantile은 폐기 → 공식 FAST + OpenVLA-bin.)</div></div>
+<div class="block"><div class="h">방법·재현</div><pre>sbatch experiments/recoverability/slurm/actiontok.sbatch  <span class="c"># .venv, 공식 FAST 토크나이저</span></pre>
+<p class="mut" style="font-size:.85rem">코드 <code>probes/exp2h_actiontok.py</code>. FAST = <code>AutoProcessor("physical-intelligence/fast")</code> (DCT+BPE, vocab 2048). expert: <code>experts/token_ntp_expert.py</code>.</p></div>
+<div class="block"><div class="h">실제 결과</div><div class="scroll"><table><thead><tr><th>표현 (form)</th><th class="n">recoverability R (3seed)</th><th></th></tr></thead><tbody>
+<tr><td>action : cont-flow (연속 MSE)</td><td class="n">+.035±.008</td><td class="mut">최저</td></tr>
+<tr><td>action : FAST-NTP (공식 FAST)</td><td class="n">+.081±.004</td><td></td></tr>
+<tr><td>action : bin256-NTP (OpenVLA)</td><td class="n">+.197±.011</td><td class="mut">action 중 최고</td></tr>
+<tr><td>instr : text-embed</td><td class="n">+.100±.011</td><td></td></tr>
+<tr><td><b>instr : text-NTP</b></td><td class="n bad">+.856±.004</td><td class="bad">高-recov = shortcut쪽</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> ① <b>이산화가 recoverability를 올린다</b> (cont-flow .035 &lt; FAST .081 &lt; bin256 .197) — 같은 action도 <b>표현에 따라 측정값이 크게</b>(측정=중요, R1 재확인). ② <b>instruction은 高-recov(+.86)</b> → hard question이 아니라 shortcut쪽. instruction-prediction aux가 강한 forcing function이 아님을 실증(R5·Hejna caveat 뒷받침).</div></div>
+</div>
+
+<!-- RT-1 full -->
+<h2 id="rt1" class="anchor">RT-1(JAX) — full-data · flow · DINO aux <span class="rid">RT1 · <span class="lab l-run" id="rt1-lab">RUNNING</span></span></h2>
+<div class="exp">
+<div class="block"><div class="h">목적</div><p>mini-VLA proxy를 넘어 <b>진짜 VLA 아키텍처(RT-1)</b>에서 "저-recov aux가 OOD 일반화를 올리나". JAX라 나중에 π0.5(openpi)와 직접 비교. <b>전체 87k 데이터</b>로 학습해 SimplerEnv rollout까지 이어짐.</p></div>
+<div class="block"><div class="h">가설</div><div class="hyp">공유 RT-1 trunk에 BC(flow-matching) + AHA aux(frozen-DINO 미래프레임 예측, online)를 co-train하면, <b>AHA arm의 OOD action R²가 BC-only보다 높다</b>. 전체 데이터에선 절대 성능도 rollout 가능 수준.</div></div>
+<div class="block"><div class="h">방법 (VLA-faithful)</div><ul>
+<li><b>캐시 0·online</b>: fractal TFRecords를 직접 스트리밍, 이미지 매 배치 인코딩.</li>
+<li><b>인코더 학습</b> (freeze 안 함).</li>
+<li><b>action = flow-matching</b> 연속 chunk(105d); <b>aux = frozen DINOv2(미래프레임 t+30) 예측</b>, online(캐시 아님).</li>
+<li>OOD = instruction hash 20% 홀드아웃 → flow-sample로 action R².</li></ul>
+<pre>sbatch experiments/recoverability/slurm/rt1_full.sbatch   <span class="c"># AUX=1(AHA), AUX=0(BC), MAX_EP=0(전체), EPOCHS=1</span></pre>
+<p class="mut" style="font-size:.85rem">코드 <code>probes/exp2h_rt1_full_jax.py</code> + <code>experts/rt1_vla_jax.py</code>. 파라미터 저장 → Stage 2(SimplerEnv 서빙).</p></div>
+<div class="block"><div class="h">실제 결과</div><div class="got pending" id="rt1-res"><b>4k 예비(real):</b> BC OOD R²=−.0055 vs AHA −.0049 = <b>tied</b>(둘 다 절대~0, 4k라 예상대로 신호 없음). <b>full-data 87k 진행 중(job 33255)</b> — 절대 성능이 올라야 BC vs AHA 차이가 보임. 결과 나오면 여기 갱신 + Stage 2(SimplerEnv rollout).</div></div>
+</div>
+
+<!-- concepts -->
+<h2 id="concepts" class="anchor">개념 부록 <span class="rid">§A · 헷갈리는 것들</span></h2>
+<div class="exp">
+<div class="block"><div class="h">정책 함수족 (𝒱)</div><p>y를 <b>어떤 함수로</b> 예측하느냐. <b>linear probe</b>=고정 DINO 위 Ridge(선형·틀림). <b>정책 함수족</b>=실제 정책망(학습되는 DINO+transformer)을 end-to-end 학습(맞음). shortcut을 잡는 건 정책이니 정책 함수족으로 재야 함. final-pose: linear .06 / policy .92.</p></div>
+<div class="block"><div class="h">학습 동역학</div><p>y를 <b>언제</b> 읽나. <b>asymptotic</b>=수렴 후 최종 loss. <b>dynamics</b>=학습 초반 얼마나 빨리(speed@¼) / 전체 곡선면적(AULC). shortcut=먼저 잡히는 것이라 동역학이 잘 잡음. 스케일 키우면 asymptotic은 saturate, dynamics는 유지.</p></div>
+<div class="block"><div class="h">recoverability vs generalization</div><p><b>다른 것·다른 데이터.</b> recoverability = <b>aux 타깃 y</b>의 예측 난이도(in-dist <b>val</b>). generalization = <b>action</b>의 <b>OOD</b> R². the LAW = 이 둘의 음의 상관.</p></div>
+<div class="block"><div class="h">단일 action이 나쁜 이유</div><p>delta action 단일예측은 정적 이미지 하나에서 <b>거의 노이즈</b>(ill-posed) = signal floor. 저-recov지만 학습가능 구조가 없어 grounding 안 됨. → <b>chunk</b>로. cur-action-chunk = BC(자기 자신은 정규화 못 함).</p></div>
+<div class="block"><div class="h">continuous가 VLM을 hurt (deferred)</div><p>pretrained VLM은 discrete token NTP로 학습됨 → continuous head가 backbone을 오염(π0.5가 KI하는 이유). VLM-스케일에선 <b>discrete 예측</b>(FAST/VQ/language NTP)이 맞음. RT-1은 LM 아니라 continuous OK. <b>VLA 적용 시 재논의.</b></p></div>
+</div>
+
+<!-- reproduce -->
+<h2 id="repro" class="anchor">전체 재현 커맨드 <span class="rid">§B</span></h2>
+<div class="exp">
+<pre><span class="c"># 0) clone + branch</span>
+git clone git@github.com:jellyho/HaF.git && cd HaF
+<span class="c"># 1) 데이터: fractal RLDS를 위 경로에 두거나 DATA= 수정 (extract/*.py, exp2h_rt1_full_jax.py)</span>
+<span class="c"># 2) 측정 캐시(측정 실험만; RT-1 full-data는 캐시 불필요)</span>
+sbatch experiments/recoverability/slurm/prep_scale.sbatch
+sbatch experiments/recoverability/slurm/encode.sbatch
+<span class="c"># 3) 측정 실험들</span>
+for n in 4000 8000 16000; do sbatch --export=ALL,SUBN=$n experiments/recoverability/slurm/exp2h.sbatch; done  <span class="c"># R1/R2</span>
+sbatch experiments/recoverability/slurm/exp2h_mixki.sbatch      <span class="c"># R3/R4 (MIXSET=base/deep)</span>
+sbatch experiments/recoverability/slurm/countfix.sbatch         <span class="c"># R3b 정정</span>
+sbatch experiments/recoverability/slurm/actiontok.sbatch        <span class="c"># AT</span>
+<span class="c"># 4) RT-1 진짜 아키텍처 (JAX, 전체 데이터, 캐시 0)</span>
+sbatch experiments/recoverability/slurm/rt1_full.sbatch         <span class="c"># BC vs AHA, 전체 87k 스트리밍</span>
+<span class="c"># 분석</span>
+python experiments/recoverability/probes/analyze_stats.py</pre>
+<p class="mut" style="font-size:.85rem">상세 핸드오프: repo <code>experiments/recoverability/CONTINUE_HERE.md</code> (환경·데이터·gotcha·pending).</p></div>
+
+<div class="foot">
+  이 랩노트는 자동 갱신됨(2026-08-03 아침까지 실험 진행하며 RUNNING→결과 반영). 검정 수치=실측(mini-VLA RT-1/fractal, 3seed).
+  gotcha: TF가 GPU 선점→<code>tf.config.set_visible_devices([],'GPU')</code>; torch <code>weights_only=False</code>; VRAM ~6–8GB; GPU=slurm 전용; RLT/humanoid 잡 안 건드림.
+  소스: <code>dashboard/labnotebook.html</code>. 결과 요약 페이지·라이브 대시보드는 별도 아티팩트.
+</div>
+</div>
