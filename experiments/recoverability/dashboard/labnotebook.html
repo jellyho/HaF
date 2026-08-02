@@ -237,6 +237,16 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 <li>OOD = instruction hash 20% 홀드아웃 → flow-sample로 action R².</li></ul>
 <pre>sbatch experiments/recoverability/slurm/rt1_full.sbatch   <span class="c"># AUX=1(AHA), AUX=0(BC), MAX_EP=0(전체), EPOCHS=1</span></pre>
 <p class="mut" style="font-size:.85rem">코드 <code>probes/exp2h_rt1_full_jax.py</code> + <code>experts/rt1_vla_jax.py</code>. 파라미터 저장 → Stage 2(SimplerEnv 서빙).</p></div>
+<div class="block"><div class="h">기대 성능 — SimplerEnv fractal 벤치 (서베이 2026-08-02)</div>
+<div class="scroll"><table><thead><tr><th>모델</th><th>~params</th><th class="n">VM avg (3T/4T)</th><th class="n">pick-coke</th></tr></thead><tbody>
+<tr><td><b>RT-1 (수렴, 우리 기준점)</b></td><td>~35M</td><td class="n">74.6 / 52.4</td><td class="n">85.7</td></tr>
+<tr><td>RT-1 (15% 데이터)</td><td>35M</td><td class="n">60.2 / ·</td><td class="n">71</td></tr>
+<tr><td>RT-1-X (OXE)</td><td>35M</td><td class="n">53.4 / 42.4</td><td class="n">56.7</td></tr>
+<tr><td>Octo-Base (일반 소형)</td><td>93M</td><td class="n bad">16.8 / 11</td><td class="n">17</td></tr>
+<tr><td>OpenVLA</td><td>7B</td><td class="n">27.7 / 34.3</td><td class="n">~17</td></tr>
+<tr><td>SpatialVLA / π0 / CogACT / MemoryVLA</td><td>3–7B</td><td class="n">69–78</td><td class="n">86–98</td></tr>
+</tbody></table></div>
+<div class="got"><b>우리 기대:</b> 경량 RT-1급을 fractal-only로 잘 수렴 → <b>~60–75%(3T)/~50–55%(4T)</b>. param 수는 fractal에서 비지배(RT-1 35M > OpenVLA 7B). <b>BC&lt;40%면 under-trained</b>(약한 방법 아님). <b>BC vs AHA 유의미 기준: ≥5%p, 2–3 태스크 일관, seed 안정</b>(1–3%p=노이즈; per-task ±3–5%p binomial). pick-coke는 포화 → 판별 태스크는 <b>Move Near·Drawer·Put-in-Drawer</b>. 3T vs 4T 규약 명시 필수. <span class="mut">출처: SimplerEnv 2405.05941 · SpatialVLA 2501.15830 · CogACT 2411.19650 · MemoryVLA 2508.19236.</span></div></div>
 <div class="block"><div class="h">실제 결과</div><div class="got pending" id="rt1-res"><b>4k 예비(real):</b> BC OOD R²=−.0055 vs AHA −.0049 = <b>tied</b>(둘 다 절대~0, 4k라 예상대로 신호 없음). <b>full-data 87k 진행 중(job 33255)</b> — 절대 성능이 올라야 BC vs AHA 차이가 보임. 결과 나오면 여기 갱신 + Stage 2(SimplerEnv rollout).</div></div>
 </div>
 
