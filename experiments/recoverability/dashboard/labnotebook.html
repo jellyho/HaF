@@ -63,7 +63,7 @@
   <h1>Recoverability 실험록: 어떻게 돌렸고, 뭘 기대했고, 실제로 어땠나</h1>
   <p class="lede">각 실험을 <b>목적 → 가설(기대) → 방법(모델·데이터·loss·split, 코드 참조) → 재현 커맨드 → 실제 결과 → 해석</b>으로.
      읽기만 해도 재현되도록 정확한 수치·경로·명령을 담았다. 검정=실측, <span class="l-run">RUNNING</span>/<span class="l-pend">PENDING</span>=진행/대기.</p>
-  <div class="meta"><span id="upd">updated 2026-08-03 새벽 · full-data 결과</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
+  <div class="meta"><span id="upd">updated 2026-08-03 새벽 · R3 재검증+RT1 진단</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
 </header>
 
 <div class="toc" id="toc">
@@ -173,7 +173,8 @@ for n in 4000 8000 16000; do sbatch --export=ALL,SUBN=$n experiments/recoverabil
 <tr><td>joint</td><td class="n">−.85</td><td class="n flat">·</td><td class="mut">예</td></tr>
 <tr><td>mean</td><td class="n flat">·</td><td class="n flat">−.57</td><td class="flat">아니오 (p=.057)</td></tr>
 </tbody></table></div>
-<div class="got"><b>결과:</b> min이 지배(−.87, CI 0제외) &gt; mean. <b>hard question 하나가 shortcut mix를 구제:</b> far-past-obs+final-pose → −.033(hard 근처) vs final-pose+initial-pose → −.062. 설계규칙 "hard 하나 넣고 멈춰라".</div></div>
+<div class="got"><b>결과:</b> min이 지배(−.87, CI 0제외) &gt; mean. <b>hard question 하나가 shortcut mix를 구제:</b> far-past-obs+final-pose → −.033(hard 근처) vs final-pose+initial-pose → −.062. 설계규칙 "hard 하나 넣고 멈춰라".</div>
+<div class="got art"><b>⚠ 정정 측정(compfix, 2026-08-03)에서 안 버팀:</b> 멤버별 독립 head로 다시 재니 Pearson <b>min=+.08~−.33 / mean=+.09~−.22</b> (2seed) — <b>min≈mean, 둘 다 약하고 불안정</b>, 원래 −.87 재현 안 됨. 즉 강한 min-dominance는 <b>concat+mean-MSE 아티팩트</b>였음(R3b와 같은 뿌리). <b>R3는 견고하지 않음 → 논문서 강등/재프레이밍.</b> 코드 <code>probes/exp2h_compfix.py</code>.</div></div>
 </div>
 
 <!-- R3b countfix -->
@@ -254,7 +255,8 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 <tr><td><b>AHA</b> (λ=1, far t+30)</td><td><b>full 87k</b></td><td class="n">18429</td><td class="n bad">−.012</td></tr>
 </tbody></table></div>
 <div class="got art"><b>결과 (정직):</b> full-data에서 <b>BC는 +.118로 실제 학습됨</b>(4k~0 → 건강한 baseline). 그러나 <b>AHA(−.012)가 BC보다 나쁨 — aux가 해쳤다</b>(가설과 반대). aux MSE가 ~1.5로 안 떨어짐 → <b>far-future(t+30, ~10s) 타깃이 거의 예측불가 = signal-floor(노이즈 주입)</b> 의심. 또는 λ=1이 너무 셈. 1epoch·1seed 교란도. <b>결론 보류.</b></div>
-<div class="block"><div class="h">진단 스윕 (job 33375)</div><div class="got pending"><b>RUNNING:</b> "λ 문제 vs signal-floor" 분리 — (λ=.3, <b>near t+5</b>)·(λ=.3, far t+30)·(λ=1, near t+5) + BC, MAX_EP=15k. near-future가 더 구조적이라 도움되면 → signal-floor 확인(far가 노이즈). 작은 λ가 도우면 → over-weighting. 결과 나오면 여기 채워짐.</div></div></div>
+<div class="block"><div class="h">진단 스윕 (job 33375) — 불충분</div><div class="got pending"><b>결과 불충분(under-train 교란):</b> 15k subset은 ~4500 step뿐(full 18k) → <b>BC 자체 −.048</b>(under-trained). 이 구간 AHA(−.023~−.041)가 BC보다 살짝 나은데 <b>전부 음수·1seed·노이즈</b>라 near/far·λ 못 가름. full-run "BC +.118 vs AHA −.012"(동일 budget)가 여전히 유효 신호.</div>
+<div class="block"><div class="h">결정적 테스트 (job 33430)</div><div class="got pending"><b>RUNNING:</b> under-train 교란 없이 <b>full 87k·동일 budget</b>으로 AHA(near t+5, λ=.3/.1) vs BC(+.118). ≥+.118이면 AHA 작동, 여전히 음수면 이 config선 안 통함(정직히).</div></div></div></div>
 </div>
 
 <!-- concepts -->
