@@ -18,12 +18,12 @@ from rail_tpu_utils import prevent_cross_region
 import tqdm_loggable.auto as tqdm
 import wandb
 
-import lap.datasets.data_loader as _data_loader
-from lap.models.model_adapter import CoTObservation
-import lap.training.checkpoints as _checkpoints
-import lap.training.config as _config
-import lap.training.mh_sharding as sharding
-import lap.training.state as training_state
+import haf.datasets.data_loader as _data_loader
+from haf.models.model_adapter import CoTObservation
+import haf.training.checkpoints as _checkpoints
+import haf.training.config as _config
+import haf.training.mh_sharding as sharding
+import haf.training.state as training_state
 
 
 def init_logging():

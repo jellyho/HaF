@@ -1,5 +1,5 @@
 [project]
-name = "lap"
+name = "haf"
 version = "0.1.0"
 description = "Open source repo for LAP based on openpi from Physical Intelligence"
 readme = "README.md"
@@ -74,12 +74,12 @@ cuda = [
 
 
 [tool.uv]
-override-dependencies = ["ml-dtypes==0.4.1", "tensorstore==0.1.74"]
+override-dependencies = ["ml-dtypes==0.4.1", "tensorstore==0.1.74", "protobuf==3.20.3", "tensorflow-metadata==1.14.0"]
 
 
 [tool.uv.sources]
 openpi = { path = "third_party/openpi/", editable = true }
-lap = { workspace = true }
+haf = { workspace = true }
 lerobot = { git = "https://github.com/huggingface/lerobot", rev = "0cf864870cf29f4738d3ade893e6fd13fbd7cdb5" }
 dlimp = { git = "https://github.com/kvablack/dlimp", rev = "ad72ce3a9b414db2185bc0b38461d4101a65477a" }
 libtpu-nightly = { index = "libtpu" }   # pin the single package

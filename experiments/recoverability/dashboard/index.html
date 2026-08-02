@@ -1,0 +1,124 @@
+<title>AHA — 진행 대시보드</title>
+<style>
+  :root{--bg:#FDFCFA;--panel:#F6F2EA;--panel2:#FBF8F2;--ink:#26231F;--mut:#8A8378;--line:#E7E0D4;
+    --coral:#CF6F53;--coral-soft:#F6E4DC;--teal:#4F958B;--teal-soft:#E4F0ED;--slate:#516069;--amber:#C0904B;--amber-soft:#efe3c9;
+    --mono:ui-monospace,"SF Mono",Menlo,"DejaVu Sans Mono",monospace;--sans:"Helvetica Neue",Helvetica,Arial,"DejaVu Sans",system-ui,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#191713;--panel:#221F1A;--panel2:#1F1C17;--ink:#ECE6DB;--mut:#9C9486;--line:#332F28;--coral:#E28769;--coral-soft:#3A2A22;--teal:#6FB8AD;--teal-soft:#20302C;--slate:#8FA1AB;--amber:#D6A860;--amber-soft:#33291a;}}
+  :root[data-theme="light"]{--bg:#FDFCFA;--panel:#F6F2EA;--panel2:#FBF8F2;--ink:#26231F;--mut:#8A8378;--line:#E7E0D4;--coral:#CF6F53;--coral-soft:#F6E4DC;--teal:#4F958B;--teal-soft:#E4F0ED;--slate:#516069;--amber:#C0904B;--amber-soft:#efe3c9;}
+  :root[data-theme="dark"]{--bg:#191713;--panel:#221F1A;--panel2:#1F1C17;--ink:#ECE6DB;--mut:#9C9486;--line:#332F28;--coral:#E28769;--coral-soft:#3A2A22;--teal:#6FB8AD;--teal-soft:#20302C;--slate:#8FA1AB;--amber:#D6A860;--amber-soft:#33291a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15.5px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 80px}
+  h2{font-size:1.2rem;margin:1.9em 0 .5em;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+  h2 .n{font-family:var(--mono);font-size:.7rem;color:var(--mut);font-weight:600}
+  p{margin:.45em 0} .mut{color:var(--mut)} .mono{font-family:var(--mono);font-size:.9em} .coral{color:var(--coral)} .teal{color:var(--teal)}
+  strong{font-weight:700} code{font-family:var(--mono);font-size:.85em;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:.05em .35em}
+  header{padding:44px 0 12px}
+  .eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--coral);font-weight:600;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .title{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin:.15em 0 .25em}
+  .sub{font-size:1.02rem;color:var(--mut);max-width:70ch}
+  .tldr{background:var(--coral-soft);border:1px solid var(--coral);border-radius:12px;padding:14px 18px;margin:14px 0;font-size:.98rem}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+  .tile{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:13px 15px}
+  .tile .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .tile .v{font-weight:800;font-size:1.02rem;margin-top:3px} .tile .d{font-size:.8rem;color:var(--mut);margin-top:2px}
+  .b{display:inline-block;font-family:var(--mono);font-size:.6rem;font-weight:700;padding:.15em .5em;border-radius:20px;letter-spacing:.02em}
+  .bd{background:var(--teal);color:#fff} .bp{background:var(--amber);color:#fff} .bx{background:var(--coral);color:#fff} .bq{background:var(--slate);color:#fff} .bn{background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.9rem}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:600}
+  td.n{font-family:var(--mono);font-size:.84rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:11px 0}
+  .card.flat{background:var(--panel2)} .card.warn{background:var(--amber-soft);border-color:var(--amber)}
+  ul{margin:.4em 0;padding-left:1.2em} li{margin:.3em 0}
+  .pipe{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+  .row .dot{flex:0 0 10px;height:10px;border-radius:50%}
+  .row .b{margin-left:auto}
+  .foot{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:.8rem}
+</style>
+<div class="wrap">
+<header>
+  <div class="eyebrow"><span>AHA · live progress</span><span>updated 2026-08-02 · count-sweep 아티팩트 진단→정정실험</span></div>
+  <div class="title">Regularizing VLA models by asking hard questions</div>
+  <p class="sub">Method = <strong>AHA</strong> (Asking Hard-question Auxiliaries). One measurable axis — <strong>recoverability</strong> —
+     unifies VLA auxiliary objectives and predicts which regularize BC vs. become its shortcut. 이 페이지는 현재 진행상황을 항상 반영하는 라이브 대시보드.</p>
+</header>
+
+<div class="tldr"><strong>지금 한 줄:</strong> 측정 방법론 코어는 <strong>탄탄(SOLID, 3스케일+CI)</strong>, 메커니즘(composition·KI)은 proxy 스케일서 확인, 서베이 완료.
+  <strong>최대 리스크 = 전부 mini-VLA(2.3% 데이터)·offline이라 외적타당성 미검증</strong> → M2(full-VLA closed-loop)가 make-or-break, 코드 ready but <strong class="coral">GPU 포화로 대기</strong>.</div>
+
+<h2>상태 한눈에 <span class="n">status at a glance</span></h2>
+<div class="tiles">
+  <div class="tile"><div class="k">measurement (R1)</div><div class="v">sign-flip 법칙</div><div class="d"><span class="b bd">SOLID</span> 3스케일·CI</div></div>
+  <div class="tile"><div class="k">composition (R3)</div><div class="v">min 지배</div><div class="d"><span class="b bp">PRELIM</span> r=−0.87</div></div>
+  <div class="tile"><div class="k">KI (R4)</div><div class="v">action-관련성</div><div class="d"><span class="b bp">PRELIM</span> 절반novel</div></div>
+  <div class="tile"><div class="k">survey (R7)</div><div class="v">필드→한 축</div><div class="d"><span class="b bd">DONE</span> 정성적</div></div>
+  <div class="tile"><div class="k">M2 full-VLA</div><div class="v">SimplerEnv</div><div class="d"><span class="b bq">DESIGN</span> make-or-break</div></div>
+  <div class="tile"><div class="k">mini rollout</div><div class="v">20k dense·trainable</div><div class="d"><span class="b bp">EXTRACT PD</span> JPEG stream</div></div>
+</div>
+
+<h2>🔧 파이프라인 <span class="n">running / queued / blocked</span></h2>
+<div class="pipe">
+  <div class="row"><span class="dot" style="background:var(--amber)"></span><span><strong>GPU 간헐 가용</strong> — L40S 8/8 대부분 사용자 RLT/humanoid 점유, 슬롯 날 때마다 내 잡이 순차 실행됨(선점 안 함).</span><span class="b bp">SHARED</span></div>
+  <div class="row"><span class="dot" style="background:var(--teal)"></span><span><strong>mixing-deep + fastlite</strong> — <strong>3seed 완주·분석 완료</strong>. 개수sweep=포화(축적아님)·다양성=inert·이산action=저분산측정.</span><span class="b bd">DONE</span></div>
+  <div class="row"><span class="dot" style="background:var(--teal)"></span><span><strong>render_test</strong> — <strong>PASS</strong> (SimplerEnv vulkan 헤드리스 렌더 OK, image 512×640, instr='pick coke can'). 관문 통과.</span><span class="b bd">DONE</span></div>
+  <div class="row"><span class="dot" style="background:var(--amber)"></span><span><strong>20k dense rollout 착수</strong> — 2k(2.3%)는 closed-loop 성공률 ~0이라 <strong>20k ep dense + trainable DINO-small</strong>로 스케일업(사용자 지시: 실제 VLA처럼 인코더 학습). 디스크 98%→Ft는 JPEG(~15GB)로, z_fl만 미리 인코딩. <strong>dense_ext</strong>: 첫 시도 TF가 GPU 전체 선점→torch OOM 버그 수정(TF를 CPU 전용으로)·재제출(33215). 끝나면 train(bc/aha)→serve→SimplerEnv.</span><span class="b bp">EXTRACT PD</span></div>
+  <div class="row"><span class="dot" style="background:var(--coral)"></span><span><strong>countfix (정정 count-sweep)</strong> — 멤버별 독립 head+loss 합산 + 총-weight 고정 대조(SUM vs MATCHED vs MEAN). "쌓을수록 도움 vs 그냥 가중치" 분리. smoke(33216) 큐→통과 시 3seed.</span><span class="b bx">NEW</span></div>
+</div>
+<p class="mut" style="font-size:.85rem">GPU 나는 순간 감시가 재호출해 자동 진행. 내가 강제로 앞당길 수 없음(자원 경합).</p>
+
+<h2>📊 결과 <span class="n">results & status</span></h2>
+<table><thead><tr><th>#</th><th>결과</th><th>핵심 수치</th><th>상태</th></tr></thead><tbody>
+<tr><td>R1</td><td><strong>측정이 답을 결정</strong> — frozen/linear probe는 부호를 뒤집음; 정책 함수족+동역학만 법칙</td><td class="n">linear +0.78/+0.69/+0.62 (틀림) · speed@¼ −0.75/−0.72/−0.69 (CI 0제외)</td><td><span class="b bd">SOLID</span></td></tr>
+<tr><td>R2</td><td>the LAW: recoverability↓⇒gen↑</td><td class="n">per-obj 음의 상관</td><td><span class="b bd">SOLID</span></td></tr>
+<tr><td>R3</td><td>composition: mix ≈ 최저-recov 멤버 (<strong>min r=−0.87 견고</strong>). <span class="coral">⚠ 개수 sweep "포화"는 아티팩트로 판명</span> — 옛 세팅이 concat+mean-MSE·1:1 고정이라 aux gradient 예산이 개수와 무관(각 멤버 1/K). 정정실험 진행 중.</td><td class="n">min −0.87 CI[−0.98,−0.67]</td><td><span class="b bp">PRELIM</span></td></tr>
+<tr><td>R4</td><td>KI: hard-KI는 action-무관 aux만 굶김; action-관련(FAST)은 생존</td><td class="n">far-past Δ−0.03 vs cur/fut-act Δ+0.02</td><td><span class="b bp">PRELIM</span></td></tr>
+<tr><td>R4b</td><td><strong>FAST-lite</strong>: 이산 action-token recoverability가 연속보다 <strong>저분산·부호안정</strong> — 이산화가 같은 저-recov를 더 깨끗이 측정(π0.5의 FAST 선택 설명)</td><td class="n">disc −0.117±0.032 vs cont −0.020±0.110 (3.4× 안정)</td><td><span class="b bp">PRELIM</span></td></tr>
+<tr><td>R5</td><td>NTP는 형식이지 recov 수준 아님 (π0.5 subtask=고-recov)</td><td class="n">개념+측정</td><td><span class="b bn">HONEST</span></td></tr>
+<tr><td>R6</td><td>state-infer는 측정상 고-recov (proprio가 장면에 보임) → 좋은 lever 아님</td><td class="n">R_deep +0.80(16k)</td><td><span class="b bn">MEASURED</span></td></tr>
+<tr><td>R7</td><td>서베이: ~55 선행 aux를 한 축에; 필드는 값싼 쪽에 몰림</td><td class="n">정성적 지도</td><td><span class="b bn">QUALITATIVE</span></td></tr>
+</tbody></table>
+
+<h2>⚠️ 정직한 평가 <span class="n">honest assessment</span></h2>
+<div class="card warn">
+  <strong>Yellow flags (숨기지 않음):</strong>
+  <ul style="margin:.4em 0">
+    <li><strong>전부 mini-VLA 대리모델</strong> — 외적타당성 미검증. M2가 make-or-break.</li>
+    <li><strong>데이터 2.3%</strong> — 2,000/87,212 에피소드, 16k/~700k transition. + 작은 모델·~500–2,400 스텝 → 절대 일반화 0 근처.</li>
+    <li><strong>offline OOD R² ≠ closed-loop 성공률</strong> — 진짜 지표 미검증.</li>
+    <li>N=12–18, CI 넓음. R4 절반 선점(π0.5). instr-infer는 novelty gap 아님(Hejna 2023).</li>
+  </ul>
+  <strong>해소된 것:</strong>
+  <ul style="margin:.4em 0 0">
+    <li><strong>통계</strong>: 부트스트랩 CI — sign-flip·speed@¼ 3스케일 robust(p≤.003).</li>
+    <li><strong>"스케일서 약해짐"</strong>: washout 아님 — <em>점근</em> 측정이 saturate, <em>동역학</em>은 유지 → "동역학으로 재라" 재강화.</li>
+  </ul>
+</div>
+
+<h2>🧭 novelty 포지셔닝 <span class="n">web-verified</span></h2>
+<div class="card">
+  <p style="margin-top:0"><strong>방어가능 최강 주장:</strong> recoverability 축 = <strong>통합적·측정가능·예측적 설계원리</strong> (흩어진 선행 aux zoo를 하나의 정량기준으로 설명 + 정책 함수족·동역학으로 재야 함(sign-flip) + composition law).</p>
+  <p style="margin-bottom:0"><strong>판정:</strong> R1 partial-novel(강함) · R3 novel · R4 절반선점 · AHA코어 partial(novel 합성). <strong>최대 위협(재순위, 2026-08-01 웹검증):</strong> 직접 선점 없음 → #1은 <strong>조립(assembly) 위협</strong>(PVI=데이터난이도 + PI-aux + alignment-weighting + BYOL-γ). Hejna/causal-confusion은 MINOR. "aux loss 추가"가 아니라 <strong>정책함수족下 recoverability 선택원리 + probe-flip + composition</strong>을 전면에.</p>
+</div>
+
+<h2>🗺 로드맵 <span class="n">roadmap</span></h2>
+<div class="card flat">
+  <p style="margin-top:0"><span class="b bd">DONE</span> 측정 방법론(R1, 3스케일+CI) · 서베이(R7) · 아키텍처 · M1(composition R3 + KI R4) · 이름(AHA) · 통계 · novelty · 논문 skeleton · <strong><strong>전체 논문 산문 draft(Abstract+§1–§10) → PAPER_DRAFT.md</strong></strong> · 위협 인용검증(CITATIONS_THREATS.md)</p>
+  <p><span class="b bd">+DONE</span> M1 심화(mixing-deep 포화/다양성 + fastlite 이산측정)</p>
+  <p><span class="b bp">NEXT (GPU 나면)</span> mini-VLA SimplerEnv rollout(closed-loop probe) · M2 full-VLA(사용자 B200 sign-off 대기)</p>
+  <p style="margin-bottom:0"><span class="b bq">DESIGN</span> <strong>M2 full-VLA + SimplerEnv</strong>(make-or-break, B200 사인오프 필요) → 논문</p>
+</div>
+
+<h2>📁 durable 문서 <span class="n">source of truth (repo)</span></h2>
+<div class="card flat" style="font-family:var(--mono);font-size:.82rem;line-height:1.85">
+  <div>AHA_MASTER.md — 인덱스 + 정직평가</div>
+  <div>RECOVERABILITY_MEASUREMENT.md — R1 + 통계(CI)</div>
+  <div>M1_RESULTS.md — R3 composition + R4 KI</div>
+  <div>SURVEY_vla_auxlosses.md — R7 서베이</div>
+  <div>M2_DESIGN.md — full-VLA + SimplerEnv + mini-rollout 준비</div>
+  <div>PAPER_OUTLINE.md — oral 논문 골격</div>
+</div>
+
+<div class="foot">AHA live dashboard · 진행마다 갱신 · source: experiments/recoverability/dashboard/index.html (repo, durable). 핵심 주장 = <strong>일반화 실패</strong>(언어무시 아님), 메커니즘 = recoverability. 목표 = ORAL.</div>
+</div>

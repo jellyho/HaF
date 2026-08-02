@@ -12,3 +12,15 @@ videos/
 *.npz
 logs/
 data/
+# large experiment outputs / caches (regenerable, not tracked)
+experiments/recoverability/outputs/
+
+# latex build artifacts + editor backups (keep .tex/.sty/.bst/.bib/.pdf source & preview)
+*.bak
+*.aux
+*.blg
+*.bbl
+*.out
+*.xdv
+*.synctex.gz
+experiments/recoverability/paper/*.log

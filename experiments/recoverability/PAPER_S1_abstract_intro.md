@@ -1,0 +1,35 @@
+# Abstract + §1 Introduction — draft
+
+*The framing that carries an oral. Sources: `PAPER_OUTLINE.md`, `AHA_MASTER.md`, `core-claim` memory (claim = GENERALIZATION failure, not "ignores language"). Honest status tags kept out of the prose; see Limitations.*
+
+---
+
+## Abstract
+
+Behavior cloning learns the cheapest input-to-action mapping that fits the demonstrations, and that cheapness is exactly why it generalizes poorly out of distribution. A large body of work repairs this with auxiliary objectives — future-frame prediction, inverse dynamics, latent actions, subtask or VQA prediction, instruction prediction — each introduced and justified case by case. We show these are not a zoo but points on a single measurable axis, **recoverability**: the usable ($\mathcal{V}$-)information an auxiliary target carries about itself given the policy's observation, measured under the policy's own function class. One law governs the axis — *the less recoverable an auxiliary's answer is from the current input, the more co-training on it improves generalization* — and it composes simply: a mixture inherits the benefit of its single hardest member. Crucially, recoverability must be measured the way the model experiences it: under the policy function class and as a learning dynamic. The convenient surrogate — a frozen linear probe — does not approximate the law, it **inverts its sign**, confidently ranking the worst auxiliaries as the best. We connect the axis to Knowledge Insulation (which we show is safe only when the insulated backbone is shaped by an action-related signal, explaining π0.5's KI+FAST), and we place ~55 prior VLA auxiliaries on the axis, revealing that the field clusters on the cheap, shortcut side. From all of this a one-line design rule falls out: **ask one hard question** — add a single low-recoverability auxiliary, chosen by measuring it correctly. We name the scheme AHA (Asking Hard-question Auxiliaries).
+
+---
+
+## 1. Introduction
+
+Imitation-learned robot policies fail out of distribution in a characteristic way. Given expert demonstrations, behavior cloning (BC) finds *a* mapping from observation to action that fits them — and by the simplicity bias of gradient descent, it finds the *cheapest* such mapping. The cheapest mapping keys on whichever input feature is most predictive of the action on the training distribution, which is frequently a spurious correlate rather than the causal structure of the task: the policy latches onto a shortcut and breaks the moment the shortcut shifts. This is the well-documented causal-confusion / shortcut failure of imitation, and it is a failure of **generalization**. (It is often described as the policy "ignoring language" or "ignoring the goal"; we take the ignoring to be a *diagnostic symptom* of the shortcut, not the disease. The disease is that BC took the cheap path.)
+
+The field's response has been to add auxiliary objectives that co-train the representation to encode more than the shortcut needs. The catalog is large and growing: predict future frames (GR-1/2, VPP), predict future *latents* (SPR, DINO-WM), invert dynamics (VPT, BCO), predict latent actions (LAPA, Moto), reconstruct masked inputs (MVP, VC-1), predict subtasks or answer visual questions (RT-2, π0.5, ECoT), predict the instruction (Hejna et al.). Each is proposed with its own motivation and its own ablation. What is missing is a principle that says, *before* training and *by measurement*, which of these will actually regularize BC and which will quietly reinforce its shortcut — and why they are the same kind of thing at all.
+
+**We provide that principle.** Our claim is that every one of these auxiliaries is a point on a single axis — **recoverability**, the usable information the auxiliary target carries about itself given the policy's observation, under the policy's own function class (§3) — and that one law relates the axis to generalization: *lower recoverability co-trains to better out-of-distribution generalization* (§5). The mechanism is exactly the simplicity bias the field has been fighting by hand: a target the policy can cheaply recover reinforces cheap features; a target it *cannot* cheaply recover forces the grounded representation the shortcut skips.
+
+The result that makes this a usable design tool — and our sharpest finding — is that **how you measure recoverability decides whether you see the law at all** (§4). The natural instrument, a frozen linear probe on pretrained features, is not a noisy estimate of the right quantity; it is anti-correlated with it, and it *inverts the law's sign* (Pearson +0.78 where the truth is −0.75), stably across dataset scales. Only when recoverability is measured under the policy's own function class, and read out as a *learning dynamic* (how cheaply the target is grabbed early) rather than an asymptote, does the law appear and stay stable. A practitioner who measures the obvious way would select precisely the wrong auxiliaries.
+
+**Contributions.**
+1. **The recoverability axis and its law** (§3, §5): a single, measurable, policy-relative quantity that unifies VLA auxiliary objectives and predicts, per objective, which regularize BC (lower is better).
+2. **How to measure it — the sign flip** (§4, the headline): recoverability must be estimated under the policy function class and as a learning dynamic; the frozen-linear-probe surrogate inverts the law. Robust across three dataset scales with bootstrap CIs.
+3. **A composition law** (§5): a mixture of auxiliaries inherits the benefit of its lowest-recoverability member — one hard question rescues a shortcut-laden mix, and neither stacking more hard members nor diversifying their modality adds beyond that.
+4. **The Knowledge Insulation interaction** (§6): when the action head is insulated from the backbone, generalization is governed by the shaping auxiliary, and hard-KI is safe only if that auxiliary is action-related — a contrastive ablation that explains π0.5's KI+FAST as implicitly KI+AHA.
+5. **A unifying survey** (§7): ~55 prior VLA auxiliaries placed on the axis, showing the field clusters on the cheap (shortcut) side and that the genuinely low-recoverability lane is underused.
+6. **[M2] Closed-loop validation** (§8): whether recoverability predicts closed-loop success on a full-scale VLA.
+
+The design rule is one sentence: **ask one hard question** — add a single low-recoverability auxiliary, and measure recoverability the way the model experiences it, or the measurement will lie to you.
+
+---
+
+*Positioning guardrails (from `CITATIONS_THREATS.md`, keep in Related Work not Intro): the novel core is $\mathcal{V}$-information under the policy function class as an auxiliary-*selection* axis, in the low-is-better direction, plus the sign-flip and composition law. Pre-empt the "assembly" threat (PVI measures data difficulty; aux-weighting weights by alignment; PI-as-aux maximizes; BYOL-γ is one method) explicitly in §2. Do not claim future-prediction itself is novel. Core claim framing = generalization failure, not "ignores language."*

@@ -83,13 +83,13 @@ Training is supported on both GPUs and TPUs.
 Train on LIBERO with GPUs:
 
 ```bash
-JAX_PLATFORMS=cuda uv run --group cuda scripts/train.py lap_libero --exp-name=lap_libero --data.rlds_data_dir=<your_data_dir>
+JAX_PLATFORMS=cuda uv run --group cuda scripts/train.py haf_libero --exp-name=haf_libero --data.rlds_data_dir=<your_data_dir>
 ```
 
 Train on LIBERO with TPUs:
 
 ```bash
-uv run scripts/train.py lap_libero --exp-name=lap_libero --data.rlds_data_dir=<your_data_dir>
+uv run scripts/train.py haf_libero --exp-name=haf_libero --data.rlds_data_dir=<your_data_dir>
 ```
 
 Expected dataset layout:
@@ -106,11 +106,11 @@ LIBERO RLDS source dataset: [openvla/modified_libero_rlds](https://huggingface.c
 
 For custom datasets:
 1. Arrange datasets in the same directory structure pattern.
-2. Define your data mixture in [src/lap/datasets/utils/mixtures.py](src/lap/datasets/utils/mixtures.py).
+2. Define your data mixture in [src/haf/datasets/utils/mixtures.py](src/haf/datasets/utils/mixtures.py).
 3. Train with:
 
 ```bash
-JAX_PLATFORMS=cuda uv run --group cuda scripts/train.py lap --exp-name=lap_custom --data.rlds_data_dir=<your_data_dir> --data.data-mix=<your_datamix_name>
+JAX_PLATFORMS=cuda uv run --group cuda scripts/train.py haf --exp-name=haf_custom --data.rlds_data_dir=<your_data_dir> --data.data-mix=<your_datamix_name>
 ```
 
 ## Acknowledgment

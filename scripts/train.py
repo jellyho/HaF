@@ -24,17 +24,17 @@ from rail_tpu_utils import prevent_cross_region
 import tqdm_loggable.auto as tqdm
 import wandb
 
-import lap.datasets.data_loader as _data_loader
-from lap.models.model_adapter import CoTObservation
-from lap.models.tokenizer import PaligemmaTokenizer
-import lap.training.array_utils as array_utils
-import lap.training.batch_visualization as batch_visualization
-import lap.training.checkpoints as _checkpoints
-import lap.training.config as _config
-import lap.training.metrics_logging as metrics_logging
-import lap.training.mh_sharding as sharding
-import lap.training.state as training_state
-import lap.training.weight_loaders as _weight_loaders
+import haf.datasets.data_loader as _data_loader
+from haf.models.model_adapter import CoTObservation
+from haf.models.tokenizer import PaligemmaTokenizer
+import haf.training.array_utils as array_utils
+import haf.training.batch_visualization as batch_visualization
+import haf.training.checkpoints as _checkpoints
+import haf.training.config as _config
+import haf.training.metrics_logging as metrics_logging
+import haf.training.mh_sharding as sharding
+import haf.training.state as training_state
+import haf.training.weight_loaders as _weight_loaders
 
 matplotlib.use("Agg")  # Use non-interactive backend for remote environments
 

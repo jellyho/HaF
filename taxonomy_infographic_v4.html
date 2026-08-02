@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hindsight and Foresight — taxonomy, evidence, experiment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F6F8; --card:#FFF; --ink:#101620; --muted:#697485;
+    --rule:#CDD4DE; --rule-soft:#E3E8ED;
+    --dense:#1F4E6B; --mid:#4A85A6; --wash:#E7EFF4; --wash2:#D4E5EF;
+    --gap:#9E2A4F; --gap-wash:#FBEDF1; --gap-line:#EED3DB;
+    --ok:#2F6B4F; --ok-wash:#E7F1EB;
+    --warn:#8A5A12; --warn-wash:#FAF1E0;
+    --dead:#8E9AAB; --dead-wash:#EDEFF2;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1280px;margin:0 auto;padding:44px 26px 68px;}
+
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:"Space Grotesk",sans-serif;font-size:clamp(28px,4vw,48px);
+    font-weight:700;line-height:1.03;letter-spacing:-.02em;margin:10px 0 0;}
+  h1 .accent{color:var(--gap);}
+  .thesis{margin:14px 0 0;max-width:74ch;font-size:15.5px;color:#2B3646;}
+  .rule{height:1px;background:var(--rule);margin:32px 0 0;}
+
+  .b{font-family:"IBM Plex Mono",monospace;font-size:9px;font-weight:600;
+    letter-spacing:.07em;text-transform:uppercase;padding:2px 5px;border-radius:2px;white-space:nowrap;}
+  .b-ok{background:var(--ok-wash);color:var(--ok);}
+  .b-warn{background:var(--warn-wash);color:var(--warn);}
+  .b-gap{background:var(--gap-wash);color:var(--gap);}
+  .b-dead{background:var(--dead-wash);color:var(--dead);}
+
+  .axis{margin-top:26px;}
+  .axis-arrow{height:1px;background:linear-gradient(90deg,var(--gap) 0%,var(--gap) 31%,var(--rule) 35%,var(--rule) 100%);}
+  .axis-label{display:flex;justify-content:space-between;margin-top:7px;
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
+    letter-spacing:.08em;text-transform:uppercase;}
+
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px;align-items:start;}
+  .col-head{margin-bottom:11px;min-height:100px;}
+  .col-tag{font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+  .col-name{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:20px;
+    letter-spacing:-.01em;margin-top:3px;}
+  .col-when{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4;}
+  .col-count{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:30px;
+    line-height:1;margin:12px 0 10px;}
+  .col-count small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;
+    font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin-top:5px;}
+
+  .stack{border:1px solid var(--rule-soft);border-radius:3px;background:var(--card);
+    padding:10px;display:flex;flex-direction:column;gap:9px;}
+  .stack.dense{border-top:3px solid var(--dense);}
+  .stack.mid{border-top:3px solid var(--mid);}
+  .grp{display:flex;flex-direction:column;gap:3px;}
+  .grp-h{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--muted);padding:2px 4px 3px;
+    border-bottom:1px solid var(--rule-soft);margin-bottom:2px;}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:10.5px;padding:4px 7px;
+    border-radius:2px;background:var(--wash);color:#173245;
+    display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+  .chip b{font-weight:500;}
+  .chip i{font-style:normal;color:var(--mid);font-size:9.5px;white-space:nowrap;}
+  .chip.hl{background:var(--wash2);}
+  .more{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);padding:2px 4px;}
+
+  .void{border:1.5px dashed var(--gap);border-radius:3px;background:var(--gap-wash);padding:18px 15px;}
+  .void-mark{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:42px;color:var(--gap);line-height:1;}
+  .void-mark small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;
+    font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--gap);margin-top:7px;opacity:.85;}
+  .void-note{font-size:12.5px;color:#5E1E33;margin-top:12px;line-height:1.45;}
+  .void-list{margin:11px 0 0;padding:0;list-style:none;
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--gap);}
+  .void-list li{padding:4px 0;border-top:1px solid var(--gap-line);}
+
+  .sec{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);margin:44px 0 4px;}
+  .sec-sub{font-size:13.5px;color:#2B3646;margin:0 0 14px;max-width:84ch;}
+
+  .miss{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .mcard{background:var(--card);border:1px solid var(--rule-soft);
+    border-left:3px solid var(--gap);border-radius:3px;padding:13px 14px;}
+  .mcard.crit{border-left-width:5px;background:#FFF9FB;}
+  .mname{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:14.5px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+  .mid-id{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);}
+  .mobj{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--gap);margin-top:6px;}
+  .mwhy{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45;}
+
+  .triad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .sc{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;padding:15px 16px;}
+  .sc.alive{border-top:3px solid var(--dense);}
+  .sc.dead{border-top:3px solid var(--dead);background:#FAFBFC;}
+  .sc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .sc-name{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:15px;}
+  .sc.dead .sc-name{color:var(--dead);}
+  .sc-txt{font-size:12.5px;color:#2B3646;margin-top:7px;line-height:1.45;}
+  .sc.dead .sc-txt{color:var(--muted);}
+
+  .etable{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);text-align:right;padding:10px 12px;
+    border-bottom:1px solid var(--rule);font-weight:500;}
+  th:first-child{text-align:left;}
+  td{padding:9px 12px;border-bottom:1px solid var(--rule-soft);text-align:right;font-family:"IBM Plex Mono",monospace;}
+  td:first-child{text-align:left;font-family:"IBM Plex Sans",sans-serif;}
+  tr:last-child td{border-bottom:none;}
+  .big{color:var(--gap);font-weight:600;}
+  .dim{color:var(--muted);}
+  .cap{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.45;}
+
+  .evid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;}
+  .stat{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;padding:15px;}
+  .stat-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .stat-num{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:22px;
+    color:var(--dense);letter-spacing:-.01em;}
+  .stat-txt{font-size:12.5px;color:#2B3646;margin-top:6px;line-height:1.45;}
+  .stat-src{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);margin-top:9px;}
+
+  /* experiment */
+  .exp{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start;}
+  .plotbox{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;padding:14px;}
+  .plotbox svg{width:100%;height:auto;display:block;}
+  .exp-side{display:flex;flex-direction:column;gap:12px;}
+  .ecard{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;padding:14px 15px;}
+  .ecard h4{font-family:"Space Grotesk",sans-serif;font-size:13.5px;font-weight:500;margin:0 0 8px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .ecard p{font-size:12.5px;color:#2B3646;margin:0;line-height:1.45;}
+  .formula{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:var(--wash);
+    padding:7px 9px;border-radius:2px;margin:8px 0 0;color:#173245;}
+  .gate{border-left:3px solid var(--warn);}
+  .gate h4{color:var(--warn);}
+
+  .integ{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .ipanel{background:var(--card);border:1px solid var(--rule-soft);border-radius:3px;padding:15px 16px;}
+  .ipanel h3{font-family:"Space Grotesk",sans-serif;font-size:14px;font-weight:500;margin:0 0 9px;}
+  .ilist{margin:0;padding:0;list-style:none;font-size:12.5px;}
+  .ilist li{padding:6px 0;border-top:1px solid var(--rule-soft);color:#2B3646;line-height:1.45;}
+  .ilist li:first-child{border-top:none;}
+  .ilist code{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--dense);}
+  .strike{text-decoration:line-through;color:var(--muted);}
+
+  footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--rule);
+    font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+
+  @media (max-width:960px){
+    .cols,.miss,.evid,.integ,.triad,.exp{grid-template-columns:1fr;}
+    .col-head{min-height:0;}
+    table{font-size:11.5px;} td,th{padding:7px 8px;}
+  }
+  @media print{body{background:#fff;} .wrap{padding:0;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Objective design · shortcut elimination · difficulty taxonomy · preliminary experiment</div>
+  <h1>Every objective has a<br>cheapest <span class="accent">cheat.</span></h1>
+  <p class="thesis">
+    A model minimizes loss by the laziest route available. For behavior cloning, that route is
+    <strong>memorization</strong> — a scene→trajectory lookup that needs no general understanding
+    (the vision-over-language shortcut is one measured face of it). But cheats are
+    <strong>objective-specific</strong>: a target that is not recoverable from the current input has none.
+    Mix in enough shortcut-free objectives — hardest of all, the <strong>retrospective</strong> ones — and
+    the cheapest solution that satisfies them <em>all at once</em> is no longer any single cheat, but the
+    causal structure they share: a generalized representation. The axis below sorts every VLA objective by
+    exactly that — <strong>how available its shortcut is</strong>.
+  </p>
+
+  <div class="rule"></div>
+
+  <div class="axis">
+    <div class="axis-arrow"></div>
+    <div class="axis-label"><span>← past</span><span>present</span><span>future →</span></div>
+  </div>
+
+  <div class="cols">
+
+    <div class="col">
+      <div class="col-head">
+        <div class="col-tag" style="color:var(--gap)">Hindsight</div>
+        <div class="col-name">Retrospective</div>
+        <div class="col-when">Answer absent from input and not recoverable from it. No cheat exists — the only way to score is to encode the causal history that produced the present.</div>
+      </div>
+      <div class="col-count" style="color:var(--gap)">0<small>works meeting the strict definition</small></div>
+      <div class="void">
+        <div class="void-mark">—<small>untried question types</small></div>
+        <p class="void-note">Nothing predicts past state that has been <em>dropped from the input</em>. Every candidate keeps the past in context.</p>
+        <ul class="void-list">
+          <li>initial scene, from current obs only</li>
+          <li>initial robot pose</li>
+          <li>the instruction, once removed</li>
+          <li>what has changed since t=0</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="col-head">
+        <div class="col-tag">Insight</div>
+        <div class="col-name">Introspective</div>
+        <div class="col-when">Answer present in input. A weak cheat (extraction) exists; forces surfacing what is already there, not abduction.</div>
+      </div>
+      <div class="col-count" style="color:var(--mid)">~15<small>dense but fragmented across many heads</small></div>
+      <div class="stack mid">
+        <div class="grp">
+          <div class="grp-h">progress / phase</div>
+          <div class="chip"><b>ProgVLA</b><i>2605.28231</i></div>
+          <div class="chip"><b>ProcVLM</b><i>2605.08774</i></div>
+          <div class="chip"><b>VIP</b><i>2210.00030</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">current subtask</div>
+          <div class="chip"><b>π0.5</b><i>2504.16054</i></div>
+          <div class="chip"><b>ECoT</b><i>2407.08693</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">spatial grounding</div>
+          <div class="chip"><b>Emma-X</b><i>2412.11974</i></div>
+          <div class="chip"><b>Voltron</b><i>2302.12766</i></div>
+          <div class="chip"><b>MolmoAct</b><i>depth tokens</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">inverse dynamics · both frames given</div>
+          <div class="chip hl"><b>LAP</b> motion-VQA<i>2602.10556</i></div>
+          <div class="chip hl"><b>UVA · UWM</b><i>2503.00200 · 2504.02792</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">masked reconstruction</div>
+          <div class="chip"><b>MTM · MaskDP</b><i>2305.02968 · 2211.12740</i></div>
+          <div class="chip"><b>MVP · R3M</b><i>2203.06173 · 2203.12601</i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="col-head">
+        <div class="col-tag">Foresight</div>
+        <div class="col-name">Prospective</div>
+        <div class="col-when">Answer absent from input — but largely redundant with the present, so the same copy-the-present cheat behavior cloning already uses still scores.</div>
+      </div>
+      <div class="col-count" style="color:var(--dense)">35+<small>saturated · the field default</small></div>
+      <div class="stack dense">
+        <div class="grp">
+          <div class="grp-h">next action / chunk</div>
+          <div class="chip hl"><b>RT-1 · RT-2</b><i>2212.06817 · 2307.15818</i></div>
+          <div class="chip hl"><b>OpenVLA · Octo</b><i>2406.09246 · 2405.12213</i></div>
+          <div class="chip hl"><b>π0 · π0-FAST · π0.5</b><i>2410.24164 · 2501.09747</i></div>
+          <div class="chip hl"><b>LAP</b> language-action<i>2602.10556</i></div>
+          <div class="chip"><b>Knowledge Insulation</b><i>2505.23705</i></div>
+          <div class="chip"><b>LA4VLA</b> vision-agnostic LA<i>2606.27295</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">future frame / video</div>
+          <div class="chip"><b>GR-1 · GR-2</b><i>2312.13139 · 2410.06158</i></div>
+          <div class="chip"><b>VPP</b><i>2412.14803</i></div>
+          <div class="chip"><b>WorldVLA · DreamVLA</b><i>2506.21539 · 2507.04447</i></div>
+          <div class="chip"><b>mimic-video</b><i>2512.15692</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">subgoal image / visual CoT</div>
+          <div class="chip"><b>CoT-VLA · SuSIE</b><i>2503.22020 · 2310.10639</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">latent action / future latent</div>
+          <div class="chip"><b>LAPA</b><i>2410.11758</i></div>
+          <div class="chip"><b>UniVLA · villa-X</b><i>2505.06111 · 2507.23682</i></div>
+          <div class="chip"><b>V-JEPA 2-AC</b><i>2506.09985</i></div>
+        </div>
+        <div class="grp">
+          <div class="grp-h">action decoding variants</div>
+          <div class="chip"><b>Discrete Diffusion VLA</b><i>2508.20072</i></div>
+          <div class="chip"><b>DFM-VLA · Dream-VLA</b><i>2603.26320 · 2512.22615</i></div>
+        </div>
+        <div class="more">+ Magma, FlowVLA, ThinkAct, 3D-VLA, GR00T N1, EO-1 …</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MECHANISM -->
+  <div class="sec">Why mixing shortcut-free objectives works</div>
+  <p class="sec-sub">The contribution of a hard objective is <strong>subtractive</strong> as much as additive: it deletes cheap solutions. The whole thesis is three steps — plus two conditions that are easy to get wrong.</p>
+  <div class="triad">
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">1 · one objective → one cheat</span></div>
+      <div class="sc-txt">Any single loss admits a lowest-complexity solution that scores well without the general representation. BC's is memorization — and the model takes it because it is cheaper.</div>
+    </div>
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">2 · no <em>common</em> cheat</span></div>
+      <div class="sc-txt">Cheats are objective-specific. Add targets whose shortcuts don't overlap — retrospective ones have none at all — and no single cheat satisfies the whole set. The cheapest shared solution is forced toward the causal structure they have in common.</div>
+    </div>
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">3 · difficulty ≡ shortcut-freeness</span></div>
+      <div class="sc-txt">"Harder" helps only in the sense that matters: <em>shortcut-orthogonal to the rest</em>. That is exactly the recoverability axis above — which is why the axis <em>is</em> the thesis.</div>
+    </div>
+  </div>
+  <div class="integ" style="margin-top:12px">
+    <div class="ipanel">
+      <h3>Condition A — a shared, bounded representation</h3>
+      <ul class="ilist">
+        <li>If every objective gets its own head/expert with slack capacity, the model memorizes each <em>separately</em> and nothing is forced.</li>
+        <li>The pressure toward generalization exists only when objectives <strong>compete for one backbone</strong> — so retrospective / world-model targets must train the shared representation, not an isolated expert.</li>
+      </ul>
+    </div>
+    <div class="ipanel">
+      <h3>Condition B — the shared solution must be reachable</h3>
+      <ul class="ilist">
+        <li>Push difficulty past what optimization and capacity can reach, and the model underfits <em>everything</em>.</li>
+        <li>The target must be underdetermined-but-recoverable — the "hard-but-learnable" quadrant the experiment below is built to locate.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- WHY RETROSPECTIVE UNIQUELY -->
+  <div class="sec">Why retrospective, and not merely hard</div>
+  <p class="sec-sub">Shortcut-free is necessary, not sufficient — far-future prediction is shortcut-free too. Four arguments single out the <em>past</em>, each ruling out one alternative.</p>
+  <div class="miss">
+    <div class="mcard crit">
+      <div class="mname">L1 · it happened <span class="mid-id">rules out far future</span></div>
+      <div class="mobj">underdetermined, but learnable</div>
+      <div class="mwhy">The far future is underdetermined <em>and</em> partly stochastic — much of it is noise. The past is underdetermined but it actually occurred and sits in the data: same difficulty, cleaner signal. ▸ predicts G_obs(retro) &gt; G_obs(far-future).</div>
+    </div>
+    <div class="mcard crit">
+      <div class="mname">L2 · the task lives there <span class="mid-id">rules out foresight · introspection</span></div>
+      <div class="mobj">recovering the past = encoding the task</div>
+      <div class="mwhy">The instruction is given at t=0; goal and progress are defined against the initial state. Recovering them from the present forces encoding task identity, phase, and the causal effect of actions so far — exactly what the forward cheat skips.</div>
+    </div>
+    <div class="mcard crit">
+      <div class="mname">L3 · abduction ⊃ extraction <span class="mid-id">rules out inverse dynamics</span></div>
+      <div class="mobj">infer the absent cause, not interpolate</div>
+      <div class="mwhy">Both-frame inverse dynamics gives the endpoints → interpolation. Retrospection gives only the present → it must infer the absent cause, and know which pasts could <em>not</em> have led here. Inverse dynamics is its degenerate case.</div>
+    </div>
+    <div class="mcard crit">
+      <div class="mname">L4 · cheat dies with vision on <span class="mid-id">rules out LA4VLA</span></div>
+      <div class="mobj">factorize invariant scene vs caused change</div>
+      <div class="mwhy">LA4VLA drops vision at the data level; the cheat re-enters when vision returns. "Predict the past" has no cheat even with full vision — it forces separating the static scene from action-caused change. Orthogonal, and composable with vision removal.</div>
+    </div>
+  </div>
+  <p class="cap">What the logic actually selects: <strong>not</strong> pixel-exact o<sub>0</sub> (often leaves no trace → noise, failing L1), but the <em>recoverable</em> past — the instruction, what has changed since t=0, task identity and progress.</p>
+
+  <!-- TWO ROUTES -->
+  <div class="sec">Two routes to kill the cheat</div>
+  <p class="sec-sub">One disease — a policy that scores by memorizing rather than understanding — has two orthogonal cures. They compose.</p>
+  <div class="integ">
+    <div class="ipanel">
+      <h3>LA4VLA — remove the shortcut's input <code>2606.27295</code></h3>
+      <ul class="ilist">
+        <li><em>Data level.</em> Pretrain on language-action alone, with <strong>vision stripped</strong>, so the policy cannot lean on scene cues. Mixed LA+VLA wins; robustness under visual perturbation improves.</li>
+        <li>Limit: the cheat can re-enter once vision returns downstream — it treats one shortcut (vision), not shortcuts in general.</li>
+      </ul>
+    </div>
+    <div class="ipanel">
+      <h3>Ours — remove the shortcut itself</h3>
+      <ul class="ilist">
+        <li><em>Objective level.</em> Keep every input, but add <strong>shortcut-free targets</strong> (retrospective) whose only solution is the general representation — with vision fully present.</li>
+        <li>Strictly more general: LA4VLA's robustness becomes a <em>special case</em> — removing an input is one way to deny a cheat; denying the cheat directly subsumes it.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- NEAR MISSES -->
+  <div class="sec">Why the hindsight column is empty</div>
+  <p class="sec-sub">Four families come close. Each fails the same test: <strong>the past is still in the model's input.</strong></p>
+  <div class="miss">
+    <div class="mcard crit">
+      <div class="mname">ReMem-VLA <span class="mid-id">2603.12942</span></div>
+      <div class="mobj">loss literally named "Past Observation Prediction"</div>
+      <div class="mwhy">Closest prior art by name. But it is a recurrent <em>memory</em> model — history is carried in its input — and it reconstructs a recent frame ô(t−m), not the episode start.</div>
+    </div>
+    <div class="mcard">
+      <div class="mname">Past-Token Prediction <span class="mid-id">2505.09561</span></div>
+      <div class="mobj">predicts past action tokens</div>
+      <div class="mwhy">A temporal-consistency regularizer for long-context diffusion policies. It conditions on the observation history, so past observations remain inputs.</div>
+    </div>
+    <div class="mcard">
+      <div class="mname">RONAR · DeChant <span class="mid-id">2411.12960 · 2306.09922</span></div>
+      <div class="mobj">narrates what the robot did</div>
+      <div class="mwhy">The full past stream is fed in, and both run as separate explainability modules rather than a policy training objective.</div>
+    </div>
+    <div class="mcard">
+      <div class="mname">HER · DIAL · HIGhER <span class="mid-id">1707.01495 · 2211.11736</span></div>
+      <div class="mobj">infers goal / instruction after the fact</div>
+      <div class="mwhy">The completed trajectory is the input. These relabel data for training; they never predict from a current-only observation.</div>
+    </div>
+  </div>
+
+  <!-- SHORTCUT FACES -->
+  <div class="sec">What the memorization cheat looks like</div>
+  <p class="sec-sub">One cheap solution, several faces. Each is a documented way a forward-only policy scores high without a general representation — and each is measured in the evidence below.</p>
+  <div class="triad">
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">Scene → trajectory recall</span><span class="b b-ok">documented</span></div>
+      <div class="sc-txt">Given a familiar layout, the policy replays a memorized kinematic sequence instead of parsing the scene. The core face — a lookup from scene to stored trajectory.</div>
+    </div>
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">Vision overrides language</span><span class="b b-ok">documented</span></div>
+      <div class="sc-txt">The policy reads the scene and treats the instruction as a weak modulator — grounding on the memorized training-task object rather than the words.</div>
+    </div>
+    <div class="sc alive">
+      <div class="sc-h"><span class="sc-name">Positional / spatial bias</span><span class="b b-ok">documented</span></div>
+      <div class="sc-txt">It grounds on where objects usually sit, not what they are; success collapses under viewpoint and layout shift. "Positional bias rather than genuine semantic understanding."</div>
+    </div>
+  </div>
+
+  <!-- MODALITY ABLATION -->
+  <div class="sec">Evidence: the instruction is barely being read</div>
+  <p class="sec-sub">Ablating input modalities at inference on LIBERO. Vision alone nearly reproduces full performance; language alone produces nothing.</p>
+  <div class="etable">
+    <table>
+      <thead><tr><th>Model / inputs</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>Avg</th></tr></thead>
+      <tbody>
+        <tr><td>OpenVLA-OFT · vision + language</td><td class="dim">97.6</td><td class="dim">98.4</td><td class="dim">97.9</td><td class="dim">94.5</td><td class="dim">97.1</td></tr>
+        <tr><td>OpenVLA-OFT · <b>vision only</b></td><td>83.2</td><td class="big">98.2</td><td>10.0</td><td class="big">85.0</td><td class="big">69.1</td></tr>
+        <tr><td>OpenVLA-OFT · language only</td><td>0.0</td><td>0.0</td><td>3.4</td><td>0.0</td><td>0.9</td></tr>
+        <tr><td>π0.5 · vision + language</td><td class="dim">98.8</td><td class="dim">98.2</td><td class="dim">98.0</td><td class="dim">92.4</td><td class="dim">96.9</td></tr>
+        <tr><td>π0.5 · <b>vision only</b></td><td>68.2</td><td>56.6</td><td>10.2</td><td class="big">71.6</td><td class="big">51.7</td></tr>
+        <tr><td>π0.5 · language only</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">Success rate (%). LIBERO-Goal is the one suite where the scene is fixed and only the instruction varies — the single place language is forced to carry information, and the only place vision-only collapses. Source: <b>When Vision Overrides Language</b>, arXiv 2602.17659 (Fang et al., UNC Chapel Hill), Table I.</p>
+
+  <div class="evid">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">4.7% vs 83.6%</span><span class="b b-ok">verified</span></div>
+      <div class="stat-txt">Given a <em>different feasible instruction</em> in the same scene, OpenVLA-OFT grounds on the instructed object 4.7% of the time — and on its memorized training-task object 83.6% of the time. π0.5: 30.8% vs 65.6%.</div>
+      <div class="stat-src">LIBERO-CF · 2602.17659, Table III</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">20% → 40%</span><span class="b b-ok">verified</span></div>
+      <div class="stat-txt">Simply <em>removing the training-task object</em> from the scene doubles average counterfactual success (grounding 39.0→64.4%). The object acts as a visual attractor that overrides language.</div>
+      <div class="stat-src">CF-Focused · 2602.17659, Table II</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">95% → &lt;30%</span><span class="b b-ok">verified</span></div>
+      <div class="stat-txt">Under modest perturbation across seven axes, success collapses; OpenVLA falls to 1.1% on camera-viewpoint shift. Models "exhibit positional bias rather than genuine semantic understanding."</div>
+      <div class="stat-src">LIBERO-Plus · 2510.13626</div>
+    </div>
+  </div>
+
+  <div class="evid">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">no instruction ≈ training task</span><span class="b b-ok">verified</span></div>
+      <div class="stat-txt">Grasp heatmaps over 50 trials: given an <em>empty</em> instruction, π0.5's grasps still cluster on the training-task object. The policy has a default behavior per scene.</div>
+      <div class="stat-src">2602.17659, Fig. 2(a)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">over-execution</span><span class="b b-ok">verified</span></div>
+      <div class="stat-txt">Told "put the apple on the tray" when trained on "apple <em>then</em> banana," π0.5 completes the full memorized sequence anyway. Shortcuts compound over long horizons.</div>
+      <div class="stat-src">2602.17659, Appendix C</div>
+    </div>
+    <div class="stat">
+      <div class="stat-top"><span class="stat-num">39.3 → 9.5</span><span class="b b-warn">caution</span></div>
+      <div class="stat-txt">Training with random <em>language dropout</em> made grounding dramatically worse — it "weakens instruction conditioning, leading to severe degradation toward vision-dominated behaviors." Relevant to how we mix language-free auxiliary samples.</div>
+      <div class="stat-src">2602.17659, Table IV (R2)</div>
+    </div>
+  </div>
+
+  <!-- ============ PRELIMINARY EXPERIMENT ============ -->
+  <div class="sec">Preliminary experiment — target redundancy</div>
+  <p class="sec-sub">The claim so far is logical: prospective targets carry a cheat, retrospective ones do not. This experiment tests it <strong>without training a policy at all</strong>, by measuring a property of the data — how available each target's shortcut is. It is the intended Figure 1.</p>
+
+  <div class="exp">
+
+    <div class="plotbox">
+      <svg viewBox="0 0 700 440" role="img" aria-label="Predicted placement of ten prediction targets on a plane of trivial redundancy versus observational gain">
+
+        <!-- useful quadrant shading -->
+        <rect x="80" y="40" width="270" height="170" fill="#FBEDF1" opacity="0.55"/>
+        <rect x="430" y="290" width="190" height="90" fill="#EDEFF2" opacity="0.7"/>
+
+        <!-- axes -->
+        <line x1="80" y1="380" x2="640" y2="380" stroke="#CDD4DE" stroke-width="1"/>
+        <line x1="80" y1="40" x2="80" y2="380" stroke="#CDD4DE" stroke-width="1"/>
+
+        <!-- quadrant labels -->
+        <text x="92" y="58" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9E2A4F" letter-spacing="1">HARD BUT LEARNABLE — USEFUL</text>
+        <text x="442" y="372" font-family="IBM Plex Mono, monospace" font-size="10" fill="#8E9AAB" letter-spacing="1">TRIVIALLY SATISFIABLE</text>
+
+        <!-- axis titles -->
+        <text x="360" y="416" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#697485">
+          R_triv  —  fraction explained by a trivial rule  →
+        </text>
+        <text x="-210" y="26" transform="rotate(-90)" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12.5" fill="#697485">
+          G_obs  —  gain from reading o_t  →
+        </text>
+
+        <!-- P1 contrast arrow -->
+        <path d="M 170 176 Q 370 120 577 346" stroke="#9E2A4F" stroke-width="1" stroke-dasharray="4 3" fill="none" opacity="0.5"/>
+        <text x="352" y="128" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#9E2A4F">same rule · same metric · opposite result</text>
+
+        <!-- prospective points -->
+        <circle cx="577" cy="346" r="7" fill="#1F4E6B"/>
+        <text x="567" y="350" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#1F4E6B">P1 · future obs (k small)</text>
+        <circle cx="539" cy="295" r="6" fill="#1F4E6B" opacity="0.75"/>
+        <text x="529" y="299" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#1F4E6B">P3 · future gripper</text>
+        <circle cx="512" cy="278" r="6" fill="#1F4E6B" opacity="0.75"/>
+        <text x="502" y="262" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#1F4E6B">P2 · action chunk</text>
+        <circle cx="377" cy="227" r="6" fill="#1F4E6B" opacity="0.55"/>
+        <text x="387" y="231" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#1F4E6B">P1 · k large</text>
+
+        <!-- introspective points -->
+        <circle cx="458" cy="91" r="6" fill="#4A85A6" opacity="0.8"/>
+        <text x="448" y="95" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4A85A6">I3 · embodiment</text>
+        <circle cx="350" cy="125" r="6" fill="#4A85A6"/>
+        <text x="360" y="129" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4A85A6">I4 · gripper now</text>
+        <circle cx="323" cy="142" r="6" fill="#4A85A6"/>
+        <text x="333" y="158" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4A85A6">I2 · subtask</text>
+        <circle cx="269" cy="159" r="6" fill="#4A85A6"/>
+        <text x="259" y="163" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#4A85A6">I1 · progress</text>
+
+        <!-- retrospective points -->
+        <circle cx="242" cy="135" r="7" fill="#9E2A4F"/>
+        <text x="252" y="115" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#9E2A4F">R3 · instruction</text>
+        <circle cx="170" cy="176" r="7" fill="#9E2A4F"/>
+        <text x="180" y="180" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#9E2A4F">R1 · initial obs</text>
+        <circle cx="188" cy="200" r="6" fill="#9E2A4F" opacity="0.8"/>
+        <text x="198" y="216" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#9E2A4F">R2 · initial pose</text>
+
+        <!-- legend -->
+        <circle cx="92" cy="404" r="5" fill="#9E2A4F"/><text x="103" y="408" font-family="IBM Plex Mono, monospace" font-size="10" fill="#697485">retrospective</text>
+        <circle cx="196" cy="404" r="5" fill="#4A85A6"/><text x="207" y="408" font-family="IBM Plex Mono, monospace" font-size="10" fill="#697485">introspective</text>
+        <circle cx="302" cy="404" r="5" fill="#1F4E6B"/><text x="313" y="408" font-family="IBM Plex Mono, monospace" font-size="10" fill="#697485">prospective</text>
+      </svg>
+      <p class="cap"><b>Predicted placement — not yet measured.</b> The experiment is a real test: if R1 lands next to P1 on the right, the taxonomy's premise fails. <b>P1 vs R1</b> is the decisive pair — both use the identical trivial rule (copy o<sub>t</sub>) and the identical latent metric, so a large gap cannot be attributed to metric choice.</p>
+    </div>
+
+    <div class="exp-side">
+
+      <div class="ecard">
+        <h4>Two metrics, one plane</h4>
+        <p>Measuring only difficulty is a trap: a target can be hard simply because it is noise. Pairing the two separates <em>hard-and-learnable</em> from <em>unpredictable</em>.</p>
+        <div class="formula">R_triv = 1 − Loss(trivial) / Loss(marginal)</div>
+        <div class="formula">G_obs&nbsp; = 1 − Loss(probe o_t) / Loss(trivial)</div>
+      </div>
+
+      <div class="ecard">
+        <h4>Trivial rules <span class="b b-ok">no training</span></h4>
+        <p>P1, R1 → copy o<sub>t</sub>. P2 → zero-order hold on the first action. I1 → dataset-mean progress. I2, R3 → <strong>per-scene majority</strong>.</p>
+        <p style="margin-top:8px">That last one does double duty: if the instruction is predictable from scene identity alone, the vision shortcut is <em>in the data</em>, not just the model — measuring the cause behind the LIBERO-CF findings above.</p>
+      </div>
+
+      <div class="ecard gate">
+        <h4>Falsification gates <span class="b b-warn">honest</span></h4>
+        <p>· R1 as redundant as P1 → episodes are too short (o<sub>0</sub> ≈ o<sub>t</sub>); stratify by length, narrow the claim.</p>
+        <p style="margin-top:6px">· Per-scene majority ≈ 100% for R3 → that dataset has one instruction per scene; the task is vacuous there. Becomes a dataset-selection criterion.</p>
+        <p style="margin-top:6px">· G_obs ≈ 0 everywhere retrospective → the targets are noise, not signal; redesign toward easier targets.</p>
+      </div>
+
+      <div class="ecard">
+        <h4>Cost</h4>
+        <p>Trivial baselines: CPU, hours. Frozen-encoder probes: one GPU, under a day. Runs in parallel with LAP codebase setup — and gates the rest of the project.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- INTEGRITY -->
+  <div class="sec">Data integrity</div>
+  <p class="sec-sub">What the verification pass changed, and what still needs a direct read.</p>
+  <div class="integ">
+    <div class="ipanel">
+      <h3>Corrected</h3>
+      <ul class="ilist">
+        <li><span class="b b-warn">id</span> Knowledge Insulation → <code>2505.23705</code> (NeurIPS 2025)</li>
+        <li><span class="b b-warn">id</span> Discrete Diffusion VLA → <code>2508.20072</code></li>
+        <li><span class="b b-warn">distinct</span> Dream-VLA <code>2512.22615</code> ≠ DreamVLA <code>2507.04447</code></li>
+        <li><span class="b b-warn">pulled</span> <span class="strike">RoboCasa 44.6 vs 47.8</span> — secondary source. Replaced by the modality-ablation table, which is primary and stronger.</li>
+        <li><span class="b b-dead">descoped</span> Copycat literature no longer cited as policy-level evidence — it is not the inference shortcut we target. The target-redundancy experiment replaces it.</li>
+        <li><span class="b b-ok">clean</span> Every 2026 arXiv ID checked resolves to a real paper.</li>
+      </ul>
+    </div>
+    <div class="ipanel">
+      <h3>Still open</h3>
+      <ul class="ilist">
+        <li>LAP motion-VQA: are <em>both</em> frames given as input? Decides its column.</li>
+        <li>LAP backbone: PaliGemma-3B or Gemma-3? Unresolved and material.</li>
+        <li>TraceVLA: past-gripper trace rendered <em>into</em> the input image, or predicted?</li>
+        <li>UVA / UWM inverse-dynamics inputs; Emma-X gripper source; π0.5 subtask ordering.</li>
+        <li>Unconfirmed figures: DFM-VLA 2.4× latency · DDVLA +0.9pp · ProgVLA 0.1B gains.</li>
+        <li>Latent metric sensitivity: run the redundancy analysis under both DINOv2 and V-JEPA2 and confirm the conclusion does not flip.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Hindsight and Foresight — pretraining generalist robot policies</span>
+    <span>axis: recoverability of the target from current input = availability of a shortcut · mixing shortcut-free objectives shifts the cheapest solution toward a general representation</span>
+  </footer>
+
+</div>
+</body>
+</html>

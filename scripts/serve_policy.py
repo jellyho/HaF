@@ -12,8 +12,8 @@ import tensorflow as tf
 # Configure Tensorflow with *no GPU devices* (to prevent clobber with PyTorch / JAX)
 tf.config.set_visible_devices([], 'GPU')
 
-import lap.policies.policy_config_adapter as _policy_config
-from lap.training import config as _config
+import haf.policies.policy_config_adapter as _policy_config
+from haf.training import config as _config
 
 
 class EnvMode(enum.Enum):
@@ -59,9 +59,9 @@ class Args:
 
 # Default checkpoints that should be used for each environment.
 DEFAULT_CHECKPOINT: dict[EnvMode, Checkpoint] = {
-    EnvMode.LAP: Checkpoint(config="lap", dir="checkpoints/lap", type="flow"),
-    EnvMode.LAP_AR: Checkpoint(config="lap", dir="checkpoints/lap", type="ar"),
-    EnvMode.LAP_LIBERO: Checkpoint(config="lap_libero", dir="checkpoints/lap_libero", type="flow"),
+    EnvMode.LAP: Checkpoint(config="haf", dir="checkpoints/lap", type="flow"),
+    EnvMode.LAP_AR: Checkpoint(config="haf", dir="checkpoints/lap", type="ar"),
+    EnvMode.LAP_LIBERO: Checkpoint(config="haf_libero", dir="checkpoints/lap_libero", type="flow"),
     EnvMode.PI05_DROID: Checkpoint(config="pi05_droid", dir="gs://openpi-assets/checkpoints/pi05_droid", type="flow"),
 }
 
