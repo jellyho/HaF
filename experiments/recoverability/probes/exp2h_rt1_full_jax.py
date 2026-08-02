@@ -19,7 +19,8 @@ DATA = "/data5/jellyho/Hindsight/fractal_rlds/fractal20220817_data/0.1.0"
 MAX_EP = int(os.environ.get("MAX_EP", 0)); EPOCHS = int(os.environ.get("EPOCHS", 2))
 N_T = int(os.environ.get("N_T", 24)); AUX = int(os.environ.get("AUX", 1)); LAMBDA = float(os.environ.get("LAMBDA", 1.0))
 BS = int(os.environ.get("BS", 64)); SMOKE = int(os.environ.get("SMOKE", 0)); SEED = int(os.environ.get("SEED", 0))
-ADIM, LANGD, DMODEL, AUXTGT_DIM, HCHUNK, KLARGE, MINLEN = 105, 384, 512, 384, 15, 30, 30
+ADIM, LANGD, DMODEL, AUXTGT_DIM, HCHUNK, MINLEN = 105, 384, 512, 384, 15, 30
+KLARGE = int(os.environ.get("AUX_OFFSET", 30))                   # future-frame offset for AHA aux (t+KLARGE); 5=near, 30=far
 rng = np.random.default_rng(SEED)
 
 # ---------- language: MiniLM embedding lookup (torch CPU, lazily cached per unique instruction) ----------
@@ -169,6 +170,8 @@ if not SMOKE:
     import json
     from flax.serialization import to_bytes
     open(f"{OUT}/rt1_full_a{AUX}.msgpack","wb").write(to_bytes({"params":params,"amu":amu,"asd":asd}))
-    json.dump({"arm":"AHA" if AUX else "BC","aux":AUX,"steps":step,"gen_ood":gen,"uniq_instr":len(_lang_cache),
-               "ood_ev":len(OOD_EV),"max_ep":MAX_EP,"epochs":EPOCHS}, open(f"{OUT}/rt1_full_a{AUX}_s{SEED}.json","w"), indent=1)
-    print(f"SAVED params + json (a{AUX})", flush=True)
+    tag=f"a{AUX}_l{LAMBDA}_o{KLARGE}_s{SEED}"
+    json.dump({"arm":"AHA" if AUX else "BC","aux":AUX,"lam":LAMBDA,"offset":KLARGE,"steps":step,"gen_ood":gen,
+               "uniq_instr":len(_lang_cache),"ood_ev":len(OOD_EV),"max_ep":MAX_EP,"epochs":EPOCHS},
+              open(f"{OUT}/rt1_full_{tag}.json","w"), indent=1)
+    print(f"SAVED params + json ({tag})", flush=True)
