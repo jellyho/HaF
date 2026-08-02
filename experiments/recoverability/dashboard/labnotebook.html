@@ -63,7 +63,7 @@
   <h1>Recoverability 실험록: 어떻게 돌렸고, 뭘 기대했고, 실제로 어땠나</h1>
   <p class="lede">각 실험을 <b>목적 → 가설(기대) → 방법(모델·데이터·loss·split, 코드 참조) → 재현 커맨드 → 실제 결과 → 해석</b>으로.
      읽기만 해도 재현되도록 정확한 수치·경로·명령을 담았다. 검정=실측, <span class="l-run">RUNNING</span>/<span class="l-pend">PENDING</span>=진행/대기.</p>
-  <div class="meta"><span id="upd">updated 2026-08-02 밤 · 첫 결과 반영</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
+  <div class="meta"><span id="upd">updated 2026-08-03 새벽 · full-data 결과</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
 </header>
 
 <div class="toc" id="toc">
@@ -226,7 +226,7 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 </div>
 
 <!-- RT-1 full -->
-<h2 id="rt1" class="anchor">RT-1(JAX) — full-data · flow · DINO aux <span class="rid">RT1 · <span class="lab l-run" id="rt1-lab">RUNNING</span></span></h2>
+<h2 id="rt1" class="anchor">RT-1(JAX) — full-data · flow · DINO aux <span class="rid">RT1 · <span class="lab l-art" id="rt1-lab">AHA HURT → 진단중</span></span></h2>
 <div class="exp">
 <div class="block"><div class="h">목적</div><p>mini-VLA proxy를 넘어 <b>진짜 VLA 아키텍처(RT-1)</b>에서 "저-recov aux가 OOD 일반화를 올리나". JAX라 나중에 π0.5(openpi)와 직접 비교. <b>전체 87k 데이터</b>로 학습해 SimplerEnv rollout까지 이어짐.</p></div>
 <div class="block"><div class="h">가설</div><div class="hyp">공유 RT-1 trunk에 BC(flow-matching) + AHA aux(frozen-DINO 미래프레임 예측, online)를 co-train하면, <b>AHA arm의 OOD action R²가 BC-only보다 높다</b>. 전체 데이터에선 절대 성능도 rollout 가능 수준.</div></div>
@@ -247,7 +247,14 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 <tr><td>SpatialVLA / π0 / CogACT / MemoryVLA</td><td>3–7B</td><td class="n">69–78</td><td class="n">86–98</td></tr>
 </tbody></table></div>
 <div class="got"><b>우리 기대:</b> 경량 RT-1급을 fractal-only로 잘 수렴 → <b>~60–75%(3T)/~50–55%(4T)</b>. param 수는 fractal에서 비지배(RT-1 35M > OpenVLA 7B). <b>BC&lt;40%면 under-trained</b>(약한 방법 아님). <b>BC vs AHA 유의미 기준: ≥5%p, 2–3 태스크 일관, seed 안정</b>(1–3%p=노이즈; per-task ±3–5%p binomial). pick-coke는 포화 → 판별 태스크는 <b>Move Near·Drawer·Put-in-Drawer</b>. 3T vs 4T 규약 명시 필수. <span class="mut">출처: SimplerEnv 2405.05941 · SpatialVLA 2501.15830 · CogACT 2411.19650 · MemoryVLA 2508.19236.</span></div></div>
-<div class="block"><div class="h">실제 결과</div><div class="got pending" id="rt1-res"><b>4k 예비(real):</b> BC OOD R²=−.0055 vs AHA −.0049 = <b>tied</b>(둘 다 절대~0, 4k라 예상대로 신호 없음). <b>full-data 87k 진행 중(job 33255)</b> — 절대 성능이 올라야 BC vs AHA 차이가 보임. 결과 나오면 여기 갱신 + Stage 2(SimplerEnv rollout).</div></div>
+<div class="block"><div class="h">실제 결과</div><div class="scroll"><table><thead><tr><th>arm</th><th>데이터</th><th class="n">steps</th><th class="n">OOD action R²</th></tr></thead><tbody>
+<tr><td>BC</td><td>4k</td><td class="n">·</td><td class="n flat">−.006</td></tr>
+<tr><td>AHA</td><td>4k</td><td class="n">·</td><td class="n flat">−.005</td></tr>
+<tr><td><b>BC</b></td><td><b>full 87k</b></td><td class="n">18192</td><td class="n good">+.118</td></tr>
+<tr><td><b>AHA</b> (λ=1, far t+30)</td><td><b>full 87k</b></td><td class="n">18429</td><td class="n bad">−.012</td></tr>
+</tbody></table></div>
+<div class="got art"><b>결과 (정직):</b> full-data에서 <b>BC는 +.118로 실제 학습됨</b>(4k~0 → 건강한 baseline). 그러나 <b>AHA(−.012)가 BC보다 나쁨 — aux가 해쳤다</b>(가설과 반대). aux MSE가 ~1.5로 안 떨어짐 → <b>far-future(t+30, ~10s) 타깃이 거의 예측불가 = signal-floor(노이즈 주입)</b> 의심. 또는 λ=1이 너무 셈. 1epoch·1seed 교란도. <b>결론 보류.</b></div>
+<div class="block"><div class="h">진단 스윕 (job 33375)</div><div class="got pending"><b>RUNNING:</b> "λ 문제 vs signal-floor" 분리 — (λ=.3, <b>near t+5</b>)·(λ=.3, far t+30)·(λ=1, near t+5) + BC, MAX_EP=15k. near-future가 더 구조적이라 도움되면 → signal-floor 확인(far가 노이즈). 작은 λ가 도우면 → over-weighting. 결과 나오면 여기 채워짐.</div></div></div>
 </div>
 
 <!-- concepts -->
