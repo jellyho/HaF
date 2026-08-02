@@ -143,6 +143,20 @@ New reusable modules in `experts/` (all CPU-smoked; scale via d_model/depth/nhea
 Still-open builds: **VQ-image** experiment (diffusers `VQModel` VQGAN → frame codes → `LatentPredictionExpert` vq
 head; diffusers 0.39 confirmed in `.venv`) and wiring the FAST-NTP/latent experts into the full pi0.5 (M2).
 
+
+## 6c. RT-1-style lightweight real-VLA (added 2026-08-02) — the first real-architecture test
+Instead of jumping to pi0.5, first test the thesis on a genuine but tiny VLA. RT-1 is ideal: our data IS RT-1's
+(fractal) and RT-1 is a SimplerEnv baseline. Backbone = image encoder -> FiLM(language) -> TokenLearner (K tokens)
+-> Transformer -> tokens [B,K,d]; head-agnostic so our experts plug in as the action/aux heads.
+- **`experts/rt1_vla.py`** (torch, .venv): EfficientNet-B0 (pretrained) + FiLM + TokenLearner + Transformer;
+  `BinActionHead` (RT-1/OpenVLA 256-bin). Smoked: TokenNTPExpert(FAST) and LatentPredictionExpert(latent aux)
+  both attach to the RT-1 tokens.
+- **`experts/rt1_vla_jax.py`** (JAX/Flax linen, matches src/haf backbone style; SigLIP-swap noted): self-contained
+  ConvStem+FiLM+TokenLearner+Transformer + BinActionHeadJAX. Smoke: `JAX_PLATFORMS=cpu python rt1_vla_jax.py`.
+  This is the path to integrate with the user's JAX stack (src/haf, openpi/pi0.5) for M2.
+Plan: train RT-1 on fractal, eval in SimplerEnv (visual_matching); arms = BC(256-bin) / +low-recov latent aux /
+swap action tokenizer {256-bin, FAST, VQ}. First "real VLA architecture x recoverability" check. GPU via slurm.
+
 ## 7. Doc index
 `AHA_MASTER.md` (status truth) · `PAPER_DRAFT.md` (full prose) · `PAPER_S*.md` (per-section) · `PAPER_OUTLINE.md` ·
 `RECOVERABILITY_MEASUREMENT.md` (R1) · `M1_RESULTS.md` (R3/R4) · `M2_DESIGN.md` · `SURVEY_vla_auxlosses.md` (R7) ·
