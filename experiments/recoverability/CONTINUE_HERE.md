@@ -169,6 +169,22 @@ Real VLAs encode images in the forward pass (not from a cache) and train the vis
 - The `dense_extract` / z_fl 20k cache and the frozen-DINO-base aux target are **SUPERSEDED** by this. (Old torch
   mini-VLA experiments still use the z_fl cache; new RT-1-JAX line does not.)
 
+
+## 6e. DEFERRED to VLA-scale (VLM backbone) — decided 2026-08-02, revisit when applying to a real VLM VLA
+RT-1 stays NAIVE (chunk action + flow-matching + frozen-DINO online aux; RT-1 is not a pretrained LM so continuous
+does not hurt it). The following were discussed and PARKED until we apply to a VLM-scale VLA (pi0.5/openpi):
+- **Predict everything as DISCRETE tokens through the backbone** (VLA-native, doesn't hurt the pretrained VLM the way
+  a continuous head does — the KI motivation): action -> FAST tokens / language-action; future frame -> VQ tokens;
+  semantic/goal -> language NTP. Measure recoverability uniformly as R = 1 - CE_val/CE_marg. Parts already built:
+  `experts/token_ntp_expert.py` (FAST + text NTP), `experts/latent_expert.py` vq head.
+- **continuous-vs-discrete ablation**: same backbone, continuous-aux (flow/MSE) vs discrete-aux (VQ/FAST) -> empirically
+  show continuous hurts the VLM backbone and discrete does not (turns the "self-evident" claim into a result).
+- **Single-action targets are BAD, esp. delta actions** (a single delta from one obs is ~ill-posed noise = signal
+  floor, not a rich hard question). Use action CHUNKS. `cur-action-chunk == BC` -> use it as the explicit "BC on the
+  recoverability axis" reference point (shows BC can't regularize itself: benefit~0, no complementarity). This also
+  reframes the old "fut-action lowest-recov" ladder point as a noise/signal-floor case, sharpening the refinement:
+  low recoverability helps ONLY with learnable structure (obs latents) not noise (single delta action).
+
 ## 7. Doc index
 `AHA_MASTER.md` (status truth) · `PAPER_DRAFT.md` (full prose) · `PAPER_S*.md` (per-section) · `PAPER_OUTLINE.md` ·
 `RECOVERABILITY_MEASUREMENT.md` (R1) · `M1_RESULTS.md` (R3/R4) · `M2_DESIGN.md` · `SURVEY_vla_auxlosses.md` (R7) ·
