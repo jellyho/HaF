@@ -128,7 +128,7 @@ JOBS = [
     ("instr:text-embed",  dict(kind="mse", tgt=lang_tgt)),
 ]
 for name, kw in JOBS:
-    R, Lv, Lm = train_measure(name, **kw)
+    R, Lv, Lm = train_measure(**kw)
     res["recov"][name] = dict(R=R, Lval=Lv, Lmarg=Lm)
     print(f"  {name:20s} R={R:+.4f}  (Lval={Lv:.4f} Lmarg={Lm:.4f})", flush=True)
 
