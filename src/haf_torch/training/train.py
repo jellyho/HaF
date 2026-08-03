@@ -16,7 +16,7 @@ import torch
 sys.path.insert(0, "/data5/jellyho/Hindsight/HaF/src")
 from haf_torch.models.config import HAFTorchConfig
 from haf_torch.models.smolvlm_vla import SmolVLMVLA
-from haf_torch.data import fractal as fx
+from haf_torch.data import loader as dl
 
 OUT = "/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs"
 
@@ -39,17 +39,17 @@ def build_config() -> HAFTorchConfig:
 
 @torch.no_grad()
 def eval_ood(model, held, amu, asd, dev, bs=8):
-    """OOD action R^2 on held-out-instruction transitions (flow-sampled)."""
+    """OOD action R^2 on held-out-instruction transitions (flow-sampled). `held` items are pre-processed."""
     if not held:
         return None
     model.eval()
     preds, ys = [], []
     for i in range(0, len(held), bs):
-        b = held[i:i + bs]
-        inp = model.build_inputs([x["image"] for x in b], [x["instruction"] for x in b], dev)
+        b = dl.collate(held[i:i + bs])
+        inp = dl.to_device(b, dev)
         a = model.sample_actions(inp).float().cpu().numpy()
         preds.append(a * asd + amu)
-        ys.append(np.stack([x["actions"] for x in b]))
+        ys.append(b["actions"].numpy())
     model.train()
     P, Y = np.concatenate(preds), np.concatenate(ys)
     return float(1 - ((P - Y) ** 2).mean() / (((Y - amu) ** 2).mean() + 1e-9))
@@ -69,54 +69,60 @@ def main():
     max_ep = int(os.environ.get("MAX_EP", 0))
     n_t = int(os.environ.get("N_T", 24))
     eval_every = int(os.environ.get("EVAL_EVERY", 1000))
-    held: list = []
-    need_mask = cfg.aux_loss_weight > 0 and cfg.aux_family == "mask"
+    workers = int(os.environ.get("WORKERS", 8))
 
-    gen = fx.stream_transitions(max_ep=max_ep, n_t=n_t, future_offset=cfg.aux_future_offset,
-                                image_size=cfg.image_size,
-                                mask_ratio=cfg.aux_mask_ratio if need_mask else 0.0, seed=cfg.seed)
-    loader = fx.batched(gen, cfg.batch_size, seed=cfg.seed, hold_ood=held)
+    # OOD holdout (preprocessed once, never trained on)
+    t_ood = time.time()
+    held = dl.collect_ood(cfg, max_ep=int(os.environ.get("OOD_EP", 300)), limit=int(os.environ.get("OOD_N", 384)),
+                          seed=cfg.seed)
+    print(f"held-out OOD transitions: {len(held)} ({time.time()-t_ood:.0f}s)", flush=True)
 
-    # action normalization from a warmup buffer
-    warm, warm_batches = [], []
+    # training loader: ALL preprocessing (decode + mask + processor) happens in worker processes
+    loader = dl.make_loader(cfg, max_ep=max_ep, n_t=n_t, num_workers=workers, seed=cfg.seed)
+
+    step, hist = 0, []
+    amu = asd = None
+    warm_actions = []
+    t0 = time.time(); t_data = 0.0; t_step = 0.0; tlast = time.time()
+
     for batch in loader:
-        warm.append(batch["actions"]); warm_batches.append(batch)
-        if sum(len(w) for w in warm) >= 512:
+        if step >= cfg.max_steps:
             break
-    A = np.concatenate(warm); amu, asd = A.mean(0), A.std(0) + 1e-6
-    print(f"warmup {len(A)} transitions for action-norm; held-OOD so far {len(held)}", flush=True)
+        t_data += time.time() - tlast
+        if amu is None:                                   # action normalization from the first batches
+            warm_actions.append(batch["actions"].numpy())
+            if sum(len(a) for a in warm_actions) < 512:
+                tlast = time.time(); continue
+            A = np.concatenate(warm_actions); amu, asd = A.mean(0), A.std(0) + 1e-6
+            print(f"action-norm from {len(A)} transitions", flush=True)
 
-    step, t0, hist = 0, time.time(), []
-    def run_batch(batch):
-        nonlocal step
-        imgs, instr = batch["images"], batch["instructions"]
-        inp = model.build_inputs(imgs, instr, dev)
-        acts = torch.tensor((batch["actions"] - amu) / asd, device=dev,
+        ts = time.time()
+        inp = dl.to_device(batch, dev)
+        acts = torch.tensor((batch["actions"].numpy() - amu) / asd, device=dev,
                             dtype=torch.bfloat16 if cfg.dtype == "bfloat16" else torch.float32)
         aux_inp = target_rep = None
         if cfg.aux_loss_weight > 0:
-            if cfg.aux_family == "mask":
-                aux_inp = model.build_inputs(batch["images_masked"], instr, dev)
-            elif cfg.aux_family == "future":
+            if cfg.aux_family == "mask" and "aux_input_ids" in batch:
+                aux_inp = dl.to_device(batch, dev, prefix="aux_")
+            elif cfg.aux_family == "future" and "fut_input_ids" in batch:
                 with torch.no_grad():
-                    target_rep = model.pooled_rep(model.build_inputs(batch["images_future"], instr, dev))
+                    target_rep = model.pooled_rep(dl.to_device(batch, dev, prefix="fut_"))
         total, parts = model.compute_loss(inp, acts, aux_inputs=aux_inp, target_rep=target_rep)
-        opt.zero_grad(); total.backward()
+        opt.zero_grad(set_to_none=True); total.backward()
         torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
         opt.step(); step += 1
+        t_step += time.time() - ts
+
         if step % 50 == 0:
             msg = " ".join(f"{k}={v.item():.4f}" for k, v in parts.items())
-            print(f"  step {step} {msg} ({(time.time()-t0)/step:.2f}s/step, heldOOD={len(held)})", flush=True)
+            el = time.time() - t0
+            print(f"  step {step} {msg} | {el/step:.2f}s/step "
+                  f"(gpu {t_step/step:.2f}s, data-wait {t_data/step:.2f}s = {100*t_data/max(el,1e-9):.0f}%) "
+                  f"| {cfg.batch_size*step/el:.1f} samp/s", flush=True)
         if step % eval_every == 0:
             r2 = eval_ood(model, held[:256], amu, asd, dev, cfg.batch_size)
             hist.append({"step": step, "ood_r2": r2}); print(f"  [eval] step {step} OOD R2 = {r2}", flush=True)
-
-    for b in warm_batches:
-        if step >= cfg.max_steps: break
-        run_batch(b)
-    for b in loader:
-        if step >= cfg.max_steps: break
-        run_batch(b)
+        tlast = time.time()
 
     r2 = eval_ood(model, held[:512], amu, asd, dev, cfg.batch_size)
     res = {"tag": tag, "config": cfg.describe(), "steps": step, "final_ood_r2": r2, "history": hist,
