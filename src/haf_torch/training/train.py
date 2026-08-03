@@ -62,6 +62,26 @@ def main():
     torch.manual_seed(cfg.seed); np.random.seed(cfg.seed)
     print(cfg.describe(), f"| tag={tag} dev={dev}", flush=True)
 
+    use_wandb = bool(int(os.environ.get("WANDB", 1)))
+    wb = None
+    if use_wandb:
+        try:
+            import wandb as _wb
+            wb = _wb
+            wb.init(project=os.environ.get("WANDB_PROJECT", "aha-smolvlm"),
+                    name=tag, group=os.environ.get("WANDB_GROUP", "smolvlm-vla"),
+                    config={"tag": tag, "batch_size": cfg.batch_size, "max_steps": cfg.max_steps, "lr": cfg.lr,
+                            "aux_w": cfg.aux_loss_weight, "aux_family": cfg.aux_family,
+                            "aux_mask": cfg.aux_mask_ratio, "aux_sigma": cfg.aux_noise_sigma,
+                            "aux_offset": cfg.aux_future_offset, "bc_ki": cfg.stop_bc_to_vlm_grad,
+                            "aux_ki": cfg.stop_aux_to_vlm_grad, "seed": cfg.seed, "vlm": cfg.vlm_id,
+                            "expert_depth": cfg.expert_depth, "expert_mode": cfg.expert_mode,
+                            "freeze_vision": cfg.freeze_vision, "state_dim": cfg.state_dim,
+                            "action_horizon": cfg.action_horizon, "desc": cfg.describe()})
+            print(f"wandb: {wb.run.url}", flush=True)
+        except Exception as e:
+            print(f"(wandb disabled: {e})", flush=True); wb = None
+
     model = SmolVLMFastVLA(cfg).to(dev); model.train()
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=1e-10)   # SmolVLA recipe
@@ -121,6 +141,11 @@ def main():
         opt.step(); step += 1
         t_step += time.time() - ts
 
+        if wb is not None:
+            log = {f"train/{k}": float(v.item()) for k, v in parts.items()}
+            log.update({"train/lr": opt.param_groups[0]["lr"], "perf/samples_per_s": cfg.batch_size * step / max(time.time()-t0, 1e-9),
+                        "perf/data_wait_frac": t_data / max(time.time()-t0, 1e-9)})
+            wb.log(log, step=step)
         if step % 50 == 0:
             msg = " ".join(f"{k}={v.item():.4f}" for k, v in parts.items())
             el = time.time() - t0
@@ -130,6 +155,8 @@ def main():
         if step % eval_every == 0:
             r2 = eval_ood(model, held[:256], amu, asd, dev, cfg.batch_size)
             hist.append({"step": step, "ood_r2": r2}); print(f"  [eval] step {step} OOD R2 = {r2}", flush=True)
+            if wb is not None and r2 is not None:
+                wb.log({"eval/ood_action_r2": r2}, step=step)
         tlast = time.time()
 
     r2 = eval_ood(model, held[:512], amu, asd, dev, cfg.batch_size)
@@ -140,6 +167,9 @@ def main():
     json.dump(res, open(f"{OUT}/smolvlm_{tag}.json", "w"), indent=1)
     torch.save({"model": model.state_dict(), "amu": amu, "asd": asd, "cfg": cfg.describe()},
                f"{OUT}/smolvlm_{tag}.pt")
+    if wb is not None:
+        if r2 is not None: wb.log({"eval/final_ood_action_r2": r2}, step=step)
+        wb.finish()
     print(f"RESULT tag={tag} steps={step} OOD_R2={r2}", flush=True)
     print(f"SAVED {OUT}/smolvlm_{tag}.json", flush=True)
 

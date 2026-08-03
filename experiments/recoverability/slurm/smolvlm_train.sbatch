@@ -10,5 +10,7 @@ export HF_HOME=/data5/jellyho/.cache/huggingface
 export TOKENIZERS_PARALLELISM=false
 export PYTHONPATH=/data5/jellyho/Hindsight/HaF/src
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export WANDB_DIR=/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs
+export WANDB__SERVICE_WAIT=300
 cd /data5/jellyho/Hindsight/HaF
 /data5/jellyho/Hindsight/HaF/.venv/bin/python -u -m haf_torch.training.train
