@@ -15,8 +15,8 @@ import torch
 
 sys.path.insert(0, "/data5/jellyho/Hindsight/HaF/src")
 from haf_torch.models.config import HAFTorchConfig
-from haf_torch.models.smolvlm_vla import SmolVLMVLA
-from haf_torch.data import loader as dl
+from haf_torch.models.smolvlm_fast import SmolVLMFastVLA
+from haf_torch.data import fast_loader as dl
 
 OUT = "/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs"
 
@@ -30,7 +30,7 @@ def build_config() -> HAFTorchConfig:
         aux_future_offset=int(os.environ.get("AUX_OFFSET", 5)),
         stop_bc_to_vlm_grad=bool(int(os.environ.get("BC_KI", 0))),
         stop_aux_to_vlm_grad=bool(int(os.environ.get("AUX_KI", 0))),
-        lr=float(os.environ.get("LR", 1e-5)),
+        lr=float(os.environ.get("LR", 1e-4)),
         batch_size=int(os.environ.get("BS", 8)),
         max_steps=int(os.environ.get("STEPS", 2000)),
         seed=int(os.environ.get("SEED", 0)),
@@ -46,9 +46,8 @@ def eval_ood(model, held, amu, asd, dev, bs=8):
     preds, ys = [], []
     for i in range(0, len(held), bs):
         b = dl.collate(held[i:i + bs])
-        inp = dl.to_device(b, dev)
-        a = model.sample_actions(inp).float().cpu().numpy()
-        preds.append(a * asd + amu)
+        a = model.sample_actions(b["image"].to(dev), b["text_ids"].to(dev), b["text_mask"].to(dev))
+        preds.append(a.float().cpu().numpy() * asd + amu)
         ys.append(b["actions"].numpy())
     model.train()
     P, Y = np.concatenate(preds), np.concatenate(ys)
@@ -62,9 +61,16 @@ def main():
     torch.manual_seed(cfg.seed); np.random.seed(cfg.seed)
     print(cfg.describe(), f"| tag={tag} dev={dev}", flush=True)
 
-    model = SmolVLMVLA(cfg).to(dev); model.train()
+    model = SmolVLMFastVLA(cfg).to(dev); model.train()
     params = [p for p in model.parameters() if p.requires_grad]
-    opt = torch.optim.AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+    opt = torch.optim.AdamW(params, lr=cfg.lr, betas=(0.9, 0.95), weight_decay=1e-10)   # SmolVLA recipe
+    warmup = int(os.environ.get("WARMUP", 300))
+    def lr_at(step):                                    # linear warmup -> cosine decay to 2.5e-6
+        if step < warmup:
+            return cfg.lr * (step + 1) / warmup
+        import math
+        p = (step - warmup) / max(1, cfg.max_steps - warmup)
+        return 2.5e-6 + 0.5 * (cfg.lr - 2.5e-6) * (1 + math.cos(math.pi * min(p, 1.0)))
 
     max_ep = int(os.environ.get("MAX_EP", 0))
     n_t = int(os.environ.get("N_T", 24))
@@ -97,19 +103,18 @@ def main():
             print(f"action-norm from {len(A)} transitions", flush=True)
 
         ts = time.time()
-        inp = dl.to_device(batch, dev)
+        img = batch["image"].to(dev, non_blocking=True)
+        tid = batch["text_ids"].to(dev, non_blocking=True)
+        tms = batch["text_mask"].to(dev, non_blocking=True)
         acts = torch.tensor((batch["actions"].numpy() - amu) / asd, device=dev,
                             dtype=torch.bfloat16 if cfg.dtype == "bfloat16" else torch.float32)
-        aux_inp = target_rep = None
-        if cfg.aux_loss_weight > 0:
-            if cfg.aux_family == "mask" and "aux_input_ids" in batch:
-                aux_inp = dl.to_device(batch, dev, prefix="aux_")
-            elif cfg.aux_family == "future" and "fut_input_ids" in batch:
-                with torch.no_grad():
-                    target_rep = model.pooled_rep(dl.to_device(batch, dev, prefix="fut_"))
-        total, parts = model.compute_loss(inp, acts, aux_inputs=aux_inp, target_rep=target_rep)
+        aux_img = batch["image_masked"].to(dev, non_blocking=True) if "image_masked" in batch else None
+        fut_img = batch["image_future"].to(dev, non_blocking=True) if "image_future" in batch else None
+        total, parts = model.compute_loss(img, tid, tms, acts, aux_images_u8=aux_img, future_images_u8=fut_img)
         opt.zero_grad(set_to_none=True); total.backward()
-        torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
+        torch.nn.utils.clip_grad_norm_(params, 10.0)                       # SmolVLA clip
+        for g in opt.param_groups:
+            g["lr"] = lr_at(step)
         opt.step(); step += 1
         t_step += time.time() - ts
 
