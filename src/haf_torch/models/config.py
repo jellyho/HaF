@@ -52,7 +52,7 @@ class HAFTorchConfig:
     seed: int = 0
 
     # data
-    image_size: int = 0                    # 0 = keep native fractal frames (256x320); GPU resizes once
+    image_size: int = 512                  # workers deliver processor-identical 512x512 (PIL LANCZOS)
     prompt_prefix: str = ""                     # optional instruction prefix
 
     def describe(self) -> str:

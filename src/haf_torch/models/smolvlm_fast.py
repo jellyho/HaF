@@ -25,17 +25,12 @@ from .config import HAFTorchConfig
 IMAGENET_MEAN = None  # SigLIP path uses [-1,1], not ImageNet stats
 
 
-def resize_with_pad(img: torch.Tensor, h: int, w: int, pad_value: float = 0.0, mode: str = "bicubic") -> torch.Tensor:
-    """Aspect-preserving resize + pad (SmolVLA convention: pad on left/top). img: [B,3,H,W] float.
-    bicubic+antialias is the closest GPU kernel to the processor's PIL LANCZOS (max err 21 vs 50 for bilinear);
-    LANCZOS itself is PIL-only (torchvision raises NotImplementedError on tensors)."""
-    b, c, ih, iw = img.shape
-    r = min(h / ih, w / iw)
-    nh, nw = max(1, int(round(ih * r))), max(1, int(round(iw * r)))
-    x = F.interpolate(img, size=(nh, nw), mode=mode, align_corners=False, antialias=True)
-    out = img.new_full((b, c, h, w), pad_value)
-    out[:, :, h - nh:, w - nw:] = x
-    return out
+def resize_for_vlm(img: torch.Tensor, size: int, mode: str = "bicubic") -> torch.Tensor:
+    """Match SmolVLM's processor EXACTLY: it does NOT preserve aspect ratio — it stretches to size x size.
+    (Measured against the processor: stretch+bicubic gives mean|diff| 0.0006 vs 0.467 for aspect-preserving pad.)
+    img: [B,3,H,W] float in [0,1] -> [B,3,size,size] in [-1,1] (processor mean/std = 0.5 => x*2-1)."""
+    x = F.interpolate(img, size=(size, size), mode=mode, align_corners=False, antialias=True)
+    return x * 2.0 - 1.0
 
 
 class FlowActionExpert(nn.Module):
@@ -91,6 +86,7 @@ class SmolVLMFastVLA(nn.Module):
         full = AutoModelForImageTextToText.from_pretrained(cfg.vlm_id, torch_dtype=dtype,
                                                            attn_implementation="sdpa")
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.vlm_id)
+        self.image_token_id = self.tokenizer.convert_tokens_to_ids("<image>")
         inner = full.model
         self.vision = inner.vision_model          # SigLIP tower (frozen)
         self.connector = inner.connector          # pixel-shuffle -> 64 tokens/img
@@ -122,8 +118,11 @@ class SmolVLMFastVLA(nn.Module):
     def encode_images(self, images_u8: torch.Tensor) -> torch.Tensor:
         """images_u8: [B,H,W,3] uint8 on GPU -> [B, 64, width] visual tokens."""
         x = images_u8.permute(0, 3, 1, 2).float() / 255.0
-        x = resize_with_pad(x, self.cfg.vlm_image_size, self.cfg.vlm_image_size, mode=self.cfg.resize_mode)
-        x = (x * 2.0 - 1.0).to(next(self.connector.parameters()).dtype)      # SigLIP expects [-1,1]
+        if x.shape[-1] != self.cfg.vlm_image_size or x.shape[-2] != self.cfg.vlm_image_size:
+            x = resize_for_vlm(x, self.cfg.vlm_image_size, self.cfg.resize_mode)   # fallback (GPU bicubic)
+        else:
+            x = x * 2.0 - 1.0                                                # workers already did LANCZOS
+        x = x.to(next(self.connector.parameters()).dtype)
         if self.cfg.freeze_vision:
             with torch.no_grad():
                 v = self.vision(pixel_values=x).last_hidden_state
@@ -131,14 +130,25 @@ class SmolVLMFastVLA(nn.Module):
             v = self.vision(pixel_values=x).last_hidden_state       # trained end-to-end (pi0.5/LAP style)
         return self.connector(v)
 
+    def embed_joint(self, images_u8: torch.Tensor, text_ids: torch.Tensor):
+        """Build the SAME sequence the processor produces (no-split template):
+             <|im_start|>User:<fake_token_around_image><global-img>[<image> x64]<fake...>TEXT<end_of_utterance>\nAssistant:
+        i.e. text embeddings with our 64 visual tokens SCATTERED into the <image> placeholder positions.
+        Prepending them instead (what we did first) yields garbage — the template structure matters."""
+        vis = self.encode_images(images_u8).to(self.param_dtype)              # [B,n_img,D]
+        emb = self.lm.embed_tokens(text_ids).to(self.param_dtype)             # [B,L,D]
+        img_pos = (text_ids == self.image_token_id)                           # [B,L] bool
+        n_slots = int(img_pos[0].sum())
+        assert n_slots == vis.shape[1], f"<image> slots {n_slots} != visual tokens {vis.shape[1]}"
+        emb = emb.clone()
+        emb[img_pos] = vis.reshape(-1, vis.shape[-1])                          # scatter in order
+        return emb
+
     def rep(self, images_u8: torch.Tensor, text_ids: torch.Tensor, text_mask: torch.Tensor) -> torch.Tensor:
-        """Joint V-L representation: [visual tokens ‖ text embeddings] through the LM, mean-pooled."""
-        vis = self.encode_images(images_u8).to(self.param_dtype)              # [B,64,D]
-        txt = self.lm.embed_tokens(text_ids).to(self.param_dtype)             # [B,L,D]
-        h = torch.cat([vis, txt], dim=1)
-        mask = torch.cat([torch.ones(vis.shape[:2], device=vis.device, dtype=text_mask.dtype), text_mask], dim=1)
-        out = self.lm(inputs_embeds=h, attention_mask=mask).last_hidden_state  # [B,64+L,D]
-        m = mask[..., None].to(out.dtype)
+        """Joint V-L representation: processor-identical sequence through the LM, mean-pooled over valid tokens."""
+        h = self.embed_joint(images_u8, text_ids)
+        out = self.lm(inputs_embeds=h, attention_mask=text_mask).last_hidden_state
+        m = text_mask[..., None].to(out.dtype)
         return (out * m).sum(1) / m.sum(1).clamp(min=1e-6)
 
     # ---- objectives ----
