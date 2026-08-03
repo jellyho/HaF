@@ -16,7 +16,7 @@ import torch
 sys.path.insert(0, "/data5/jellyho/Hindsight/HaF/src")
 from haf_torch.models.config import HAFTorchConfig
 from haf_torch.models.smolvlm_fast import SmolVLMFastVLA
-from haf_torch.data import fast_loader as dl
+from haf_torch.data import rlds_loader as dl
 
 OUT = "/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs"
 
@@ -100,12 +100,11 @@ def main():
 
     # OOD holdout (preprocessed once, never trained on)
     t_ood = time.time()
-    held = dl.collect_ood(cfg, max_ep=int(os.environ.get("OOD_EP", 300)), limit=int(os.environ.get("OOD_N", 384)),
-                          seed=cfg.seed)
+    held = dl.collect_ood(cfg, limit=int(os.environ.get("OOD_N", 384)), seed=cfg.seed)
     print(f"held-out OOD transitions: {len(held)} ({time.time()-t_ood:.0f}s)", flush=True)
 
     # training loader: ALL preprocessing (decode + mask + processor) happens in worker processes
-    loader = dl.make_loader(cfg, max_ep=max_ep, n_t=n_t, num_workers=workers, seed=cfg.seed)
+    loader = dl.make_loader(cfg, seed=cfg.seed)   # tf.data handles parallelism/shuffle/prefetch internally
 
     step, hist = 0, []
     amu = asd = None
