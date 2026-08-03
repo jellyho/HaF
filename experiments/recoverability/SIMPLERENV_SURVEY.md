@@ -152,10 +152,22 @@ GeoAlign 85.3 uses SimplerEnv training demos · GR00T official repo uses a non-s
 
 ## 4. Calibration for US (haf_torch SmolVLM-VLA on fractal)
 
-1. **Our closest published analogue is `open-pi-zero`** (allenzren): π₀-style **flow matching** initialised from a
-   **raw VLM (PaliGemma)**, trained on **fractal only**, evaluated **zero-shot** in SimplerEnv →
-   **88.0 / 80.3 / 56.0 → 70.1**. That is the realistic target band for our BC baseline; near it ⇒ pipeline sound.
-   (Caveat: it is 3.6B vs our 256M.)
+1. **Our closest published analogue is `open-pi-zero`** (allenzren) — **verified from the repo README, not just
+   a citing table**, because the "scratch vs pretrained" question matters:
+   - initialises from a **pretrained PaliGemma 3B VLM** (2.291B fine-tuned) **+ a newly initialised action expert
+     (0.315B)** — it does **NOT** load Physical Intelligence's π₀ weights; it re-implements the π₀ architecture.
+   - **no large-scale robot pretraining**: README says *"I have only trained with either fractal or bridge dataset
+     ... so far"*. So it is **not "from scratch"** and **not "robot-pretrained"** — exactly our regime:
+     pretrained VLM + fresh action expert + fractal-only + zero-shot to sim.
+   - training scale: **fractal 30k gradient steps ≈ 8 epochs**, ~1.5–2 days on one L40 node (8–12 h on H100s).
+   - **⚠ number conflict**: the repo README reports **Pick-up-Coke 97.9 / Open-Drawer 49.5**, while SpatialVLA's
+     table cites it as **88.0 / 80.3 / 56.0 → 70.1**. Both are in circulation; cite the source explicitly.
+   Practical read for us: this is the right band to aim at, but note the gap in scale (3.6B vs our 0.33B) and in
+   training (their 30k steps ≈ 8 epochs vs our current 20k steps ≈ 0.8 epoch).
+
+   **Distinguish from official π₀** (Physical Intelligence): that one *is* pretrained on large robot mixtures
+   (OXE etc.) before fine-tuning — a different regime, and its SimplerEnv numbers are all third-party repros
+   spanning ~19 points.
 2. **Second anchor: RT-1 itself** (52.4 A / 74.6 B) — same data, same tasks, scratch, 35M. If our VLM-init model
    on fractal-only lands far below RT-1 on the same convention, suspect the harness/training, not the objective.
 3. **🔴 Our harness is not protocol-standard.** `scripts/simpler/main.py` enumerates five env ids
