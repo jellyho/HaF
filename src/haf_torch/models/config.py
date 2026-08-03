@@ -7,7 +7,8 @@ class HAFTorchConfig:
     # backbone
     vlm_id: str = "HuggingFaceTB/SmolVLM-256M-Instruct"
     dtype: str = "bfloat16"
-    freeze_vlm: bool = False
+    freeze_vlm: bool = False               # freeze the whole VLM (LM+connector); False = fine-tune
+    freeze_vision: bool = False            # pi0.5/LAP train the vision tower too (SmolVLA freezes it)
     # SmolVLM/Idefics3 tiles each image (~17 tiles => ~1139 tokens => OOM). One robot view is enough.
     image_splitting: bool = False
     vlm_image_size: int = 384              # tile longest edge fed to the VLM                    # False = fine-tune the pretrained VLM (the real-VLA regime)

@@ -93,10 +93,12 @@ class SmolVLMFastVLA(nn.Module):
         self.vision = inner.vision_model          # SigLIP tower (frozen)
         self.connector = inner.connector          # pixel-shuffle -> 64 tokens/img
         self.lm = inner.text_model                # ALL 30 layers (we need them for NTP/aux)
+        self.lm_head = full.lm_head               # kept so token-level (NTP) objectives are possible
         self.width = int(self.lm.config.hidden_size)
 
-        for p in self.vision.parameters():        # SmolVLA freezes the vision tower
-            p.requires_grad_(False)
+        if cfg.freeze_vision:                     # SmolVLA freezes it; pi0.5/LAP (our default) trains it
+            for p in self.vision.parameters():
+                p.requires_grad_(False)
         if cfg.freeze_vlm:
             for p in self.lm.parameters():
                 p.requires_grad_(False)
@@ -110,7 +112,8 @@ class SmolVLMFastVLA(nn.Module):
 
     def train(self, mode: bool = True):
         super().train(mode)
-        self.vision.eval()                        # keep the frozen tower in eval (SmolVLA does this too)
+        if self.cfg.freeze_vision:
+            self.vision.eval()                    # only force eval when the tower is actually frozen
         return self
 
     # ---- image path: no processor, all on GPU ----
@@ -119,8 +122,11 @@ class SmolVLMFastVLA(nn.Module):
         x = images_u8.permute(0, 3, 1, 2).float() / 255.0
         x = resize_with_pad(x, self.cfg.vlm_image_size, self.cfg.vlm_image_size)
         x = (x * 2.0 - 1.0).to(next(self.connector.parameters()).dtype)      # SigLIP expects [-1,1]
-        with torch.no_grad() if not any(p.requires_grad for p in self.vision.parameters()) else torch.enable_grad():
-            v = self.vision(pixel_values=x).last_hidden_state
+        if self.cfg.freeze_vision:
+            with torch.no_grad():
+                v = self.vision(pixel_values=x).last_hidden_state
+        else:
+            v = self.vision(pixel_values=x).last_hidden_state       # trained end-to-end (pi0.5/LAP style)
         return self.connector(v)
 
     def rep(self, images_u8: torch.Tensor, text_ids: torch.Tensor, text_mask: torch.Tensor) -> torch.Tensor:
