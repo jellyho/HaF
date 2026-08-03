@@ -62,7 +62,7 @@ class FlowActionExpert(nn.Module):
         # SmolVLA samples t ~ Beta(1.5,1.0)*0.999+0.001 (favours the noisy end)
         b = actions.shape[0]
         beta = torch.distributions.Beta(torch.tensor(1.5), torch.tensor(1.0))
-        t = (beta.sample((b, 1)).to(actions.device) * 0.999 + 0.001).to(actions.dtype)
+        t = (beta.sample((b, 1)) * 0.999 + 0.001).to(device=actions.device, dtype=actions.dtype)
         eps = torch.randn_like(actions)
         x_t = (1 - t) * eps + t * actions
         return ((self.velocity(x_t, t, cond) - (actions - eps)) ** 2).mean()
@@ -104,8 +104,9 @@ class SmolVLMFastVLA(nn.Module):
                 p.requires_grad_(False)
 
         self.expert = FlowActionExpert(self.width, cfg.action_dim, cfg.action_horizon,
-                                       cfg.expert_width, cfg.expert_depth)
-        self.aux_head = nn.Linear(self.width, self.width) if cfg.aux_loss_weight > 0 else None
+                                       cfg.expert_width, cfg.expert_depth).to(dtype)
+        self.aux_head = nn.Linear(self.width, self.width).to(dtype) if cfg.aux_loss_weight > 0 else None
+        self.param_dtype = dtype
 
     def train(self, mode: bool = True):
         super().train(mode)
@@ -124,8 +125,8 @@ class SmolVLMFastVLA(nn.Module):
 
     def rep(self, images_u8: torch.Tensor, text_ids: torch.Tensor, text_mask: torch.Tensor) -> torch.Tensor:
         """Joint V-L representation: [visual tokens ‖ text embeddings] through the LM, mean-pooled."""
-        vis = self.encode_images(images_u8)                                   # [B,64,D]
-        txt = self.lm.embed_tokens(text_ids)                                  # [B,L,D]
+        vis = self.encode_images(images_u8).to(self.param_dtype)              # [B,64,D]
+        txt = self.lm.embed_tokens(text_ids).to(self.param_dtype)             # [B,L,D]
         h = torch.cat([vis, txt], dim=1)
         mask = torch.cat([torch.ones(vis.shape[:2], device=vis.device, dtype=text_mask.dtype), text_mask], dim=1)
         out = self.lm(inputs_embeds=h, attention_mask=mask).last_hidden_state  # [B,64+L,D]
