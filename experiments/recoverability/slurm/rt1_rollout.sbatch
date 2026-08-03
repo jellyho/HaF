@@ -21,7 +21,7 @@ for ARM in 0 1; do
   sleep 110   # jax + params + MiniLM load + jit
   echo "=== SimplerEnv visual_matching ARM=$ARM ($NT trials/task) ==="
   export SAPIEN_RENDERER=vulkan
-  $SIM scripts/simpler/main.py --host 127.0.0.1 --port $PORT --task-set visual_matching --num-trials-per-task $NT
+  $SIM scripts/simpler/main.py --args.host 127.0.0.1 --args.port $PORT --args.task-set visual_matching --args.num-trials-per-task $NT
   echo "=== rollout ARM=$ARM rc=$? ==="
   kill $SRV 2>/dev/null; sleep 5
 done

@@ -20,7 +20,7 @@ for ARM in 0 1; do
   SRV=$!; sleep 110
   export SAPIEN_RENDERER=vulkan
   echo "=== SimplerEnv visual_matching (e6) ARM=$ARM ($NT/task) ==="
-  $SIM scripts/simpler/main.py --host 127.0.0.1 --port $PORT --task-set visual_matching --num-trials-per-task $NT
+  $SIM scripts/simpler/main.py --args.host 127.0.0.1 --args.port $PORT --args.task-set visual_matching --args.num-trials-per-task $NT
   echo "=== roll_e6 ARM=$ARM rc=$? ==="; kill $SRV 2>/dev/null; sleep 5
 done
 echo "=== roll_e6 done (competent BC vs AHA) ==="
