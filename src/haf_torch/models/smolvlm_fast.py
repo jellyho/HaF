@@ -21,6 +21,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .config import HAFTorchConfig
+from .action_expert import ActionExpert
 
 IMAGENET_MEAN = None  # SigLIP path uses [-1,1], not ImageNet stats
 
@@ -31,48 +32,6 @@ def resize_for_vlm(img: torch.Tensor, size: int, mode: str = "bicubic") -> torch
     img: [B,3,H,W] float in [0,1] -> [B,3,size,size] in [-1,1] (processor mean/std = 0.5 => x*2-1)."""
     x = F.interpolate(img, size=(size, size), mode=mode, align_corners=False, antialias=True)
     return x * 2.0 - 1.0
-
-
-class FlowActionExpert(nn.Module):
-    """Flow-matching action head over the pooled VLM representation (pi0/SmolVLA-style, MSE on velocity)."""
-
-    def __init__(self, cond_dim: int, action_dim: int, horizon: int, width: int = 512, depth: int = 2, t_dim: int = 64):
-        super().__init__()
-        self.adim = action_dim * horizon
-        self.action_dim, self.horizon, self.t_dim = action_dim, horizon, t_dim
-        layers, d_in = [], self.adim + cond_dim + t_dim
-        for _ in range(depth):
-            layers += [nn.Linear(d_in, width), nn.GELU()]; d_in = width
-        layers += [nn.Linear(d_in, self.adim)]
-        self.net = nn.Sequential(*layers)
-
-    def _temb(self, t):
-        half = self.t_dim // 2
-        fr = torch.exp(-math.log(10000.0) * torch.arange(half, device=t.device, dtype=torch.float32) / half)
-        a = t.float() * fr[None]
-        return torch.cat([torch.cos(a), torch.sin(a)], -1).to(t.dtype)
-
-    def velocity(self, x_t, t, cond):
-        return self.net(torch.cat([x_t, cond, self._temb(t)], -1))
-
-    def loss(self, cond, actions):
-        # SmolVLA samples t ~ Beta(1.5,1.0)*0.999+0.001 (favours the noisy end)
-        b = actions.shape[0]
-        beta = torch.distributions.Beta(torch.tensor(1.5), torch.tensor(1.0))
-        t = (beta.sample((b, 1)) * 0.999 + 0.001).to(device=actions.device, dtype=actions.dtype)
-        eps = torch.randn_like(actions)
-        x_t = (1 - t) * eps + t * actions
-        return ((self.velocity(x_t, t, cond) - (actions - eps)) ** 2).mean()
-
-    @torch.no_grad()
-    def sample(self, cond, steps: int = 10, n_samples: int = 8):
-        B = cond.shape[0]
-        c = cond.repeat_interleave(n_samples, 0)
-        x = torch.randn(B * n_samples, self.adim, device=cond.device, dtype=cond.dtype)
-        for k in range(steps):
-            t = torch.full((B * n_samples, 1), k / steps, device=cond.device, dtype=cond.dtype)
-            x = x + (1.0 / steps) * self.velocity(x, t, c)
-        return x.view(B, n_samples, self.adim).mean(1)
 
 
 class SmolVLMFastVLA(nn.Module):
@@ -103,8 +62,10 @@ class SmolVLMFastVLA(nn.Module):
             for p in self.connector.parameters():
                 p.requires_grad_(False)
 
-        self.expert = FlowActionExpert(self.width, cfg.action_dim, cfg.action_horizon,
-                                       cfg.expert_width, cfg.expert_depth).to(dtype)
+        # proprio/state token lives in the PREFIX (pi0.5; SmolVLA ablation: prefix 80.3 vs suffix 73.3)
+        self.state_proj = nn.Linear(cfg.state_dim, self.width).to(dtype)
+        self.expert = ActionExpert(self.width, len(self.lm.layers), cfg.action_dim, cfg.action_horizon,
+                                   cfg.expert_width_mult, cfg.expert_depth, cfg.expert_heads).to(dtype)
         self.aux_head = nn.Linear(self.width, self.width).to(dtype) if cfg.aux_loss_weight > 0 else None
         self.param_dtype = dtype
 
@@ -144,26 +105,38 @@ class SmolVLMFastVLA(nn.Module):
         emb[img_pos] = vis.reshape(-1, vis.shape[-1])                          # scatter in order
         return emb
 
-    def rep(self, images_u8: torch.Tensor, text_ids: torch.Tensor, text_mask: torch.Tensor) -> torch.Tensor:
-        """Joint V-L representation: processor-identical sequence through the LM, mean-pooled over valid tokens."""
+    def prefix(self, images_u8, text_ids, text_mask, state=None):
+        """Run the VLM prefix (image+language[+state token]) and return (per-layer hidden states, mask, pooled rep)."""
         h = self.embed_joint(images_u8, text_ids)
-        out = self.lm(inputs_embeds=h, attention_mask=text_mask).last_hidden_state
-        m = text_mask[..., None].to(out.dtype)
-        return (out * m).sum(1) / m.sum(1).clamp(min=1e-6)
+        mask = text_mask
+        if state is not None:
+            st = self.state_proj(state.to(self.param_dtype)).unsqueeze(1)      # [B,1,D] appended to the prefix
+            h = torch.cat([h, st], 1)
+            mask = torch.cat([mask, torch.ones(mask.shape[0], 1, dtype=mask.dtype, device=mask.device)], 1)
+        out = self.lm(inputs_embeds=h, attention_mask=mask, output_hidden_states=True)
+        hs = out.hidden_states                                                 # tuple len = n_layers+1
+        m = mask[..., None].to(out.last_hidden_state.dtype)
+        pooled = (out.last_hidden_state * m).sum(1) / m.sum(1).clamp(min=1e-6)
+        return hs, mask, pooled
+
+    def rep(self, images_u8, text_ids, text_mask, state=None):
+        """Pooled joint V-L representation (used by the auxiliary heads)."""
+        return self.prefix(images_u8, text_ids, text_mask, state)[2]
 
     # ---- objectives ----
-    def compute_loss(self, images_u8, text_ids, text_mask, actions,
+    def compute_loss(self, images_u8, text_ids, text_mask, actions, state=None,
                      aux_images_u8=None, future_images_u8=None):
         cfg = self.cfg
-        rep = self.rep(images_u8, text_ids, text_mask)
+        hs, mask, rep = self.prefix(images_u8, text_ids, text_mask, state)
         parts, total = {}, rep.new_zeros(())
         if cfg.enable_action_training:
-            cond = rep.detach() if cfg.stop_bc_to_vlm_grad else rep
-            l = self.expert.loss(cond, actions); parts["bc"] = l.detach()
+            hs_bc = tuple(h.detach() for h in hs) if cfg.stop_bc_to_vlm_grad else hs   # KI: insulate the VLM
+            a = actions.view(actions.shape[0], cfg.action_horizon, cfg.action_dim)
+            l = self.expert.loss(hs_bc, mask, a); parts["bc"] = l.detach()
             total = total + cfg.action_loss_weight * l
         if cfg.aux_loss_weight > 0 and self.aux_head is not None:
             if cfg.aux_family == "mask":
-                src = self.rep(aux_images_u8, text_ids, text_mask); tgt = rep.detach()
+                src = self.rep(aux_images_u8, text_ids, text_mask, state); tgt = rep.detach()
             elif cfg.aux_family == "noise":
                 src = rep; tgt = rep.detach()
                 if cfg.aux_noise_sigma > 0:
@@ -171,7 +144,7 @@ class SmolVLMFastVLA(nn.Module):
             elif cfg.aux_family == "future":
                 src = rep
                 with torch.no_grad():
-                    tgt = self.rep(future_images_u8, text_ids, text_mask)
+                    tgt = self.rep(future_images_u8, text_ids, text_mask, state)
             else:
                 raise ValueError(cfg.aux_family)
             if cfg.stop_aux_to_vlm_grad:
@@ -184,6 +157,7 @@ class SmolVLMFastVLA(nn.Module):
         return total, parts
 
     @torch.no_grad()
-    def sample_actions(self, images_u8, text_ids, text_mask):
-        rep = self.rep(images_u8, text_ids, text_mask)
-        return self.expert.sample(rep, self.cfg.flow_steps_sample, self.cfg.flow_samples)
+    def sample_actions(self, images_u8, text_ids, text_mask, state=None):
+        hs, mask, _ = self.prefix(images_u8, text_ids, text_mask, state)
+        a = self.expert.sample(hs, mask, self.cfg.flow_steps_sample)           # [B,horizon,action_dim]
+        return a.reshape(a.shape[0], -1)

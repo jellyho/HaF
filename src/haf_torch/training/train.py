@@ -46,7 +46,8 @@ def eval_ood(model, held, amu, asd, dev, bs=8):
     preds, ys = [], []
     for i in range(0, len(held), bs):
         b = dl.collate(held[i:i + bs])
-        a = model.sample_actions(b["image"].to(dev), b["text_ids"].to(dev), b["text_mask"].to(dev))
+        a = model.sample_actions(b["image"].to(dev), b["text_ids"].to(dev), b["text_mask"].to(dev),
+                                 b["state"].to(dev))
         preds.append(a.float().cpu().numpy() * asd + amu)
         ys.append(b["actions"].numpy())
     model.train()
@@ -108,9 +109,11 @@ def main():
         tms = batch["text_mask"].to(dev, non_blocking=True)
         acts = torch.tensor((batch["actions"].numpy() - amu) / asd, device=dev,
                             dtype=torch.bfloat16 if cfg.dtype == "bfloat16" else torch.float32)
+        sta = batch["state"].to(dev, non_blocking=True)
         aux_img = batch["image_masked"].to(dev, non_blocking=True) if "image_masked" in batch else None
         fut_img = batch["image_future"].to(dev, non_blocking=True) if "image_future" in batch else None
-        total, parts = model.compute_loss(img, tid, tms, acts, aux_images_u8=aux_img, future_images_u8=fut_img)
+        total, parts = model.compute_loss(img, tid, tms, acts, state=sta,
+                                          aux_images_u8=aux_img, future_images_u8=fut_img)
         opt.zero_grad(set_to_none=True); total.backward()
         torch.nn.utils.clip_grad_norm_(params, 10.0)                       # SmolVLA clip
         for g in opt.param_groups:

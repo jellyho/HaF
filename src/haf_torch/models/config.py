@@ -17,10 +17,12 @@ class HAFTorchConfig:
     # action space (RT-1/fractal defaults)
     action_dim: int = 7
     action_horizon: int = 15
+    state_dim: int = 8                     # fractal: base_pose_tool_reached(7) + gripper_closed(1)
 
     # action expert (flow matching), mirrors pi0 action expert
-    expert_width: int = 512
-    expert_depth: int = 2
+    expert_width_mult: float = 0.75        # pi0.5/SmolVLA: expert width = 0.75 x VLM width
+    expert_depth: int = 6                  # two-tower expert layers (cross-attends VLM every other layer)
+    expert_heads: int = 8
     flow_steps_train: int = 1                   # single random t per sample
     flow_steps_sample: int = 10
     flow_samples: int = 8
