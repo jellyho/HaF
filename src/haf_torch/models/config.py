@@ -21,7 +21,8 @@ class HAFTorchConfig:
 
     # action expert (flow matching), mirrors pi0 action expert
     expert_width_mult: float = 0.75        # pi0.5/SmolVLA: expert width = 0.75 x VLM width
-    expert_depth: int = 6                  # two-tower expert layers (cross-attends VLM every other layer)
+    expert_depth: int = 30                 # pi0.5: one expert layer per VLM layer (dense coupling)
+    expert_mode: str = "joint"             # joint = pi0.5 (attend [prefix||suffix] every layer) | interleave = SmolVLA
     expert_heads: int = 8
     flow_steps_train: int = 1                   # single random t per sample
     flow_steps_sample: int = 10

@@ -35,15 +35,23 @@ def _round_ffn(w: int, mult: int = 256) -> int:
 
 
 class ExpertLayer(nn.Module):
-    """One expert layer: (self-attn over action tokens) OR (cross-attn into the VLM hidden states) + MLP."""
+    """One expert layer. `mode`:
+         'joint' — pi0.5 style: attend over [VLM hidden ‖ action tokens] in ONE attention (dense coupling)
+         'cross' — attend only into the VLM hidden states
+         'self'  — attend only over the action tokens (causal)
+    """
 
-    def __init__(self, width: int, kv_width: int, nhead: int, cross: bool):
+    def __init__(self, width: int, kv_width: int, nhead: int, cross: bool, mode: str = "cross"):
         super().__init__()
-        self.cross, self.nhead, self.hd = cross, nhead, width // nhead
+        self.mode = mode if mode in ("joint", "cross", "self") else ("cross" if cross else "self")
+        self.cross, self.nhead, self.hd = (self.mode != "self"), nhead, width // nhead
         self.n1 = nn.RMSNorm(width) if hasattr(nn, "RMSNorm") else nn.LayerNorm(width)
         self.q = nn.Linear(width, width, bias=False)
-        self.k = nn.Linear(kv_width if cross else width, width, bias=False)
-        self.v = nn.Linear(kv_width if cross else width, width, bias=False)
+        kin = kv_width if self.mode != "self" else width
+        self.k = nn.Linear(kin, width, bias=False)
+        self.v = nn.Linear(kin, width, bias=False)
+        self.k_self = nn.Linear(width, width, bias=False) if self.mode == "joint" else None
+        self.v_self = nn.Linear(width, width, bias=False) if self.mode == "joint" else None
         self.o = nn.Linear(width, width, bias=False)
         self.n2 = nn.RMSNorm(width) if hasattr(nn, "RMSNorm") else nn.LayerNorm(width)
         ff = _round_ffn(width)
@@ -52,16 +60,29 @@ class ExpertLayer(nn.Module):
     def forward(self, x, ctx=None, ctx_mask=None, causal=True):
         B, L, _ = x.shape
         h = self.n1(x)
-        src = ctx if self.cross else h
         q = self.q(h).view(B, L, self.nhead, self.hd).transpose(1, 2)
-        S = src.shape[1]
-        k = self.k(src).view(B, S, self.nhead, self.hd).transpose(1, 2)
-        v = self.v(src).view(B, S, self.nhead, self.hd).transpose(1, 2)
-        if self.cross:
+        if self.mode == "self":
+            k = self.k(h).view(B, L, self.nhead, self.hd).transpose(1, 2)
+            v = self.v(h).view(B, L, self.nhead, self.hd).transpose(1, 2)
+            a = F.scaled_dot_product_attention(q, k, v, is_causal=causal)
+        elif self.mode == "cross":
+            S = ctx.shape[1]
+            k = self.k(ctx).view(B, S, self.nhead, self.hd).transpose(1, 2)
+            v = self.v(ctx).view(B, S, self.nhead, self.hd).transpose(1, 2)
             am = None if ctx_mask is None else ctx_mask[:, None, None, :].bool()
             a = F.scaled_dot_product_attention(q, k, v, attn_mask=am)
-        else:
-            a = F.scaled_dot_product_attention(q, k, v, is_causal=causal)
+        else:  # joint: one attention over [prefix ‖ suffix]  (pi0.5 dense coupling)
+            S = ctx.shape[1]
+            kp = self.k(ctx).view(B, S, self.nhead, self.hd).transpose(1, 2)
+            vp = self.v(ctx).view(B, S, self.nhead, self.hd).transpose(1, 2)
+            ks = self.k_self(h).view(B, L, self.nhead, self.hd).transpose(1, 2)
+            vs = self.v_self(h).view(B, L, self.nhead, self.hd).transpose(1, 2)
+            k = torch.cat([kp, ks], 2); v = torch.cat([vp, vs], 2)
+            pm = torch.ones(B, S, dtype=torch.bool, device=x.device) if ctx_mask is None else ctx_mask.bool()
+            causal_suffix = torch.tril(torch.ones(L, L, dtype=torch.bool, device=x.device))
+            am = torch.cat([pm[:, None, None, :].expand(B, 1, L, S),
+                            causal_suffix[None, None].expand(B, 1, L, L)], dim=-1)
+            a = F.scaled_dot_product_attention(q, k, v, attn_mask=am)
         x = x + self.o(a.transpose(1, 2).reshape(B, L, -1))
         return x + self.mlp(self.n2(x))
 
@@ -70,7 +91,8 @@ class ActionExpert(nn.Module):
     """Two-tower action expert. Call `loss(vlm_hidden_list, prefix_mask, actions)` / `sample(...)`."""
 
     def __init__(self, vlm_width: int, vlm_layers: int, action_dim: int, horizon: int,
-                 width_mult: float = 0.75, depth: int = 6, nhead: int = 8, t_dim: int = 128):
+                 width_mult: float = 0.75, depth: int = 6, nhead: int = 8, t_dim: int = 128,
+                 mode: str = "joint"):
         super().__init__()
         w = int(vlm_width * width_mult) // nhead * nhead                       # divisible by heads
         self.width, self.depth, self.horizon, self.action_dim, self.t_dim = w, depth, horizon, action_dim, t_dim
@@ -79,7 +101,11 @@ class ActionExpert(nn.Module):
         self.read_idx = [int((i + 1) * vlm_layers / depth) for i in range(depth)]
         self.in_proj = nn.Linear(action_dim, w)                                # action token embedding
         self.t_mlp = nn.Sequential(nn.Linear(t_dim, w), nn.SiLU(), nn.Linear(w, w))
-        self.layers = nn.ModuleList([ExpertLayer(w, vlm_width, nhead, cross=(i % 2 == 1)) for i in range(depth)])
+        # pi0.5: every expert layer is paired with a VLM layer ("joint"). SmolVLA interleaves self/cross.
+        self.layers = nn.ModuleList([
+            ExpertLayer(w, vlm_width, nhead, cross=(i % 2 == 1),
+                        mode=("joint" if mode == "joint" else ("cross" if i % 2 == 1 else "self")))
+            for i in range(depth)])
         self.norm = nn.RMSNorm(w) if hasattr(nn, "RMSNorm") else nn.LayerNorm(w)
         self.out = nn.Linear(w, action_dim)
 
@@ -90,11 +116,10 @@ class ActionExpert(nn.Module):
     def forward(self, hidden_states, prefix_mask, x_t, t):
         h = self._tokens(x_t, t)
         for i, layer in enumerate(self.layers):
-            if layer.cross:
-                ctx = hidden_states[self.read_idx[i]]                           # VLM hidden at the mapped depth
-                h = layer(h, ctx=ctx, ctx_mask=prefix_mask)
-            else:
+            if layer.mode == "self":
                 h = layer(h)
+            else:
+                h = layer(h, ctx=hidden_states[self.read_idx[i]], ctx_mask=prefix_mask)
         return self.out(self.norm(h))                                           # [B, horizon, action_dim]
 
     def loss(self, hidden_states, prefix_mask, actions):

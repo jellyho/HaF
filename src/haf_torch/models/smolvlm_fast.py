@@ -65,7 +65,8 @@ class SmolVLMFastVLA(nn.Module):
         # proprio/state token lives in the PREFIX (pi0.5; SmolVLA ablation: prefix 80.3 vs suffix 73.3)
         self.state_proj = nn.Linear(cfg.state_dim, self.width).to(dtype)
         self.expert = ActionExpert(self.width, len(self.lm.layers), cfg.action_dim, cfg.action_horizon,
-                                   cfg.expert_width_mult, cfg.expert_depth, cfg.expert_heads).to(dtype)
+                                   cfg.expert_width_mult, cfg.expert_depth, cfg.expert_heads,
+                                   mode=cfg.expert_mode).to(dtype)
         self.aux_head = nn.Linear(self.width, self.width).to(dtype) if cfg.aux_loss_weight > 0 else None
         self.param_dtype = dtype
 
