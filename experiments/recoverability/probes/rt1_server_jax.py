@@ -13,7 +13,7 @@ import sys; sys.path.insert(0, "/data5/jellyho/Hindsight/HaF/experiments/recover
 from rt1_vla_jax import RT1BackboneJAX
 
 OUT = "/data5/jellyho/Hindsight/HaF/experiments/recoverability/outputs"
-ARM = os.environ.get("ARM", "1"); PORT = int(os.environ.get("PORT", "8000"))
+ARM = os.environ.get("ARM", "1"); PORT = int(os.environ.get("PORT", "8000")); CKPT = os.environ.get("CKPT", "")
 ADIM, LANGD, DMODEL, CH, DOF = 105, 384, 512, 15, 7
 
 def temb(t, d=64):
@@ -34,7 +34,7 @@ model=RT1Flow()
 # init template params, then overwrite with loaded ones
 tmpl=model.init(jax.random.PRNGKey(0), jnp.zeros((1,224,224,3)), jnp.zeros((1,LANGD)), jnp.zeros((1,ADIM)), jnp.zeros((1,1)))
 ck=from_bytes({"params":tmpl,"amu":np.zeros(ADIM,np.float32),"asd":np.ones(ADIM,np.float32)},
-              open(f"{OUT}/rt1_full_a{ARM}.msgpack","rb").read())
+              open(f"{OUT}/rt1_full_a{ARM}{CKPT}.msgpack","rb").read())
 params=ck["params"]; amu=jnp.asarray(ck["amu"]); asd=jnp.asarray(ck["asd"])
 print(f"loaded rt1_full_a{ARM}.msgpack (ARM={'AHA' if ARM=='1' else 'BC'})", flush=True)
 

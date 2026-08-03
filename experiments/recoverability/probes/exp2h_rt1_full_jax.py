@@ -136,6 +136,10 @@ def train_step(params, opt_state, key, im, lng, a, fut):
     (l,(fm,aux)),g=jax.value_and_grad(L,has_aux=True)(params); upd,opt_state=tx.update(g,opt_state,params)
     return optax.apply_updates(params,upd),opt_state,fm,aux
 
+from flax.serialization import to_bytes
+def save_ckpt():
+    if not SMOKE:
+        open(f"{OUT}/rt1_full_a{AUX}{CKPT}.msgpack","wb").write(to_bytes({"params":params,"amu":amu,"asd":asd}))
 step=0
 for ep in range(EPOCHS):
     for Ft,Ffl,act,lang in batches(MAX_EP):
@@ -144,6 +148,7 @@ for ep in range(EPOCHS):
         params,opt_state,fm,aux=train_step(params,opt_state,sk,norm(Ft),jnp.asarray(lang),jnp.asarray(an),fut)
         step+=1
         if step%200==0: print(f"  ep{ep} step{step} flow={float(fm):.3f} aux={float(aux):.3f} uniq_instr={len(_lang_cache)} ood_ev={len(OOD_EV)}", flush=True)
+    save_ckpt(); print(f"  [ckpt] epoch {ep} done, step {step}, params saved", flush=True)   # per-epoch checkpoint
 
 # ---------- offline OOD generalization: flow-sample actions on held-out instructions, R^2 ----------
 @jax.jit
@@ -169,7 +174,7 @@ print(f"RESULT arm={'AHA' if AUX else 'BC'}  steps={step}  OOD action R2 = {gen}
 if not SMOKE:
     import json
     from flax.serialization import to_bytes
-    open(f"{OUT}/rt1_full_a{AUX}.msgpack","wb").write(to_bytes({"params":params,"amu":amu,"asd":asd}))
+    open(f"{OUT}/rt1_full_a{AUX}{CKPT}.msgpack","wb").write(to_bytes({"params":params,"amu":amu,"asd":asd}))
     tag=f"a{AUX}_l{LAMBDA}_o{KLARGE}_s{SEED}"
     json.dump({"arm":"AHA" if AUX else "BC","aux":AUX,"lam":LAMBDA,"offset":KLARGE,"steps":step,"gen_ood":gen,
                "uniq_instr":len(_lang_cache),"ood_ev":len(OOD_EV),"max_ep":MAX_EP,"epochs":EPOCHS},
