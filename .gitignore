@@ -12,6 +12,8 @@ videos/
 *.npz
 logs/
 data/
+!src/**/data/
+!src/**/data/**
 # large experiment outputs / caches (regenerable, not tracked)
 experiments/recoverability/outputs/
 
