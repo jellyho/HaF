@@ -63,7 +63,7 @@
   <h1>Recoverability 실험록: 어떻게 돌렸고, 뭘 기대했고, 실제로 어땠나</h1>
   <p class="lede">각 실험을 <b>목적 → 가설(기대) → 방법(모델·데이터·loss·split, 코드 참조) → 재현 커맨드 → 실제 결과 → 해석</b>으로.
      읽기만 해도 재현되도록 정확한 수치·경로·명령을 담았다. 검정=실측, <span class="l-run">RUNNING</span>/<span class="l-pend">PENDING</span>=진행/대기.</p>
-  <div class="meta"><span id="upd">updated 2026-08-03 새벽 · R3 재검증+RT1 진단</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
+  <div class="meta"><span id="upd">updated 2026-08-03 아침 · AHA 조건부 작동 확인</span><span>repo: jellyho/HaF</span><span>mini-VLA + RT-1(JAX)</span><span>RT-1/fractal</span></div>
 </header>
 
 <div class="toc" id="toc">
@@ -227,7 +227,7 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 </div>
 
 <!-- RT-1 full -->
-<h2 id="rt1" class="anchor">RT-1(JAX) — full-data · flow · DINO aux <span class="rid">RT1 · <span class="lab l-art" id="rt1-lab">AHA HURT → 진단중</span></span></h2>
+<h2 id="rt1" class="anchor">RT-1(JAX) — full-data · flow · DINO aux <span class="rid">RT1 · <span class="lab l-meas" id="rt1-lab">AHA HELPS (조건부)</span></span></h2>
 <div class="exp">
 <div class="block"><div class="h">목적</div><p>mini-VLA proxy를 넘어 <b>진짜 VLA 아키텍처(RT-1)</b>에서 "저-recov aux가 OOD 일반화를 올리나". JAX라 나중에 π0.5(openpi)와 직접 비교. <b>전체 87k 데이터</b>로 학습해 SimplerEnv rollout까지 이어짐.</p></div>
 <div class="block"><div class="h">가설</div><div class="hyp">공유 RT-1 trunk에 BC(flow-matching) + AHA aux(frozen-DINO 미래프레임 예측, online)를 co-train하면, <b>AHA arm의 OOD action R²가 BC-only보다 높다</b>. 전체 데이터에선 절대 성능도 rollout 가능 수준.</div></div>
@@ -256,7 +256,14 @@ sbatch experiments/recoverability/slurm/countfix.sbatch   <span class="c"># SEED
 </tbody></table></div>
 <div class="got art"><b>결과 (정직):</b> full-data에서 <b>BC는 +.118로 실제 학습됨</b>(4k~0 → 건강한 baseline). 그러나 <b>AHA(−.012)가 BC보다 나쁨 — aux가 해쳤다</b>(가설과 반대). aux MSE가 ~1.5로 안 떨어짐 → <b>far-future(t+30, ~10s) 타깃이 거의 예측불가 = signal-floor(노이즈 주입)</b> 의심. 또는 λ=1이 너무 셈. 1epoch·1seed 교란도. <b>결론 보류.</b></div>
 <div class="block"><div class="h">진단 스윕 (job 33375) — 불충분</div><div class="got pending"><b>결과 불충분(under-train 교란):</b> 15k subset은 ~4500 step뿐(full 18k) → <b>BC 자체 −.048</b>(under-trained). 이 구간 AHA(−.023~−.041)가 BC보다 살짝 나은데 <b>전부 음수·1seed·노이즈</b>라 near/far·λ 못 가름. full-run "BC +.118 vs AHA −.012"(동일 budget)가 여전히 유효 신호.</div>
-<div class="block"><div class="h">결정적 테스트 (job 33430)</div><div class="got pending"><b>RUNNING:</b> under-train 교란 없이 <b>full 87k·동일 budget</b>으로 AHA(near t+5, λ=.3/.1) vs BC(+.118). ≥+.118이면 AHA 작동, 여전히 음수면 이 config선 안 통함(정직히).</div></div></div></div>
+<div class="block"><div class="h">결정적 테스트 (job 33430) — AHA 조건부 작동 ✅</div>
+<div class="scroll"><table><thead><tr><th>arm</th><th>config</th><th class="n">OOD R² (full, ~20k step)</th></tr></thead><tbody>
+<tr><td>BC</td><td>—</td><td class="n">+.118</td></tr>
+<tr><td><b>AHA</b></td><td><b>near t+5, λ=0.1</b></td><td class="n good">+.157 (BC +.039)</td></tr>
+<tr><td>AHA</td><td>near t+5, λ=0.3</td><td class="n">+.029</td></tr>
+<tr><td>AHA</td><td>far t+30, λ=1.0</td><td class="n bad">−.012</td></tr>
+</tbody></table></div>
+<div class="got"><b>결과:</b> <b>AHA는 real RT-1·full-data서 BC를 이긴다 — 단 조건부.</b> ① <b>signal-floor 확인</b>: far t+30(노이즈)=해침, near t+5(구조적)=도움. ② <b>weighting</b>: λ=1(해침)→.3(중립)→<b>.1(도움)</b>. → "저-recov 무조건 좋다"가 아니라 <b>"구조적 저-recov를 적절한 weight로"</b>. <b>caveat: 1 seed·λ창 좁음·offline(closed-loop 아님).</b> multi-seed 확인 진행 중(job).</div></div></div></div>
 </div>
 
 <!-- concepts -->

@@ -1,0 +1,238 @@
+<title>AHA — 실험 결과 리뷰</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#F7F6F2; --panel:#FFFFFF; --panel2:#F1EFE9; --ink:#211F1A; --mut:#7C776C; --faint:#A8A296;
+    --line:#E4E0D6; --coral:#CF6F53; --coral-soft:#F6E7DF;
+    --teal:#3E8E82; --amber:#BC8A3E; --slate:#5E6B73; --rust:#B4543A;
+    --teal-soft:#E1EFEC; --amber-soft:#F2E7CF; --slate-soft:#E5E9EB; --rust-soft:#F5E2DB;
+    --mono:"SF Mono",ui-monospace,Menlo,"DejaVu Sans Mono",monospace;
+    --sans:"Helvetica Neue",-apple-system,Segoe UI,Roboto,"DejaVu Sans",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#17150F; --panel:#201D16; --panel2:#1B1913; --ink:#ECE7DA; --mut:#9A9384; --faint:#6E685B;
+    --line:#312D24; --coral:#E08767; --coral-soft:#38271F;
+    --teal:#63B3A6; --amber:#D6A860; --slate:#8FA0A9; --rust:#D9765A;
+    --teal-soft:#1B2B27; --amber-soft:#2E2716; --slate-soft:#20282B; --rust-soft:#301E18;
+  }}
+  :root[data-theme="light"]{--bg:#F7F6F2;--panel:#FFFFFF;--panel2:#F1EFE9;--ink:#211F1A;--mut:#7C776C;--faint:#A8A296;--line:#E4E0D6;--coral:#CF6F53;--coral-soft:#F6E7DF;--teal:#3E8E82;--amber:#BC8A3E;--slate:#5E6B73;--rust:#B4543A;--teal-soft:#E1EFEC;--amber-soft:#F2E7CF;--slate-soft:#E5E9EB;--rust-soft:#F5E2DB;}
+  :root[data-theme="dark"]{--bg:#17150F;--panel:#201D16;--panel2:#1B1913;--ink:#ECE7DA;--mut:#9A9384;--faint:#6E685B;--line:#312D24;--coral:#E08767;--coral-soft:#38271F;--teal:#63B3A6;--amber:#D6A860;--slate:#8FA0A9;--rust:#D9765A;--teal-soft:#1B2B27;--amber-soft:#2E2716;--slate-soft:#20282B;--rust-soft:#301E18;}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:0 22px 100px}
+  a{color:var(--coral);text-decoration:none} a:hover{text-decoration:underline}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  /* header */
+  header{padding:52px 0 22px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .kicker{font-family:var(--mono);font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:var(--coral);font-weight:600}
+  h1{font-size:clamp(1.7rem,4.4vw,2.5rem);font-weight:800;letter-spacing:-.025em;line-height:1.08;margin:.35em 0 .3em;text-wrap:balance}
+  .lede{font-size:1.06rem;color:var(--mut);max-width:64ch;margin:0}
+  .meta{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem;color:var(--faint)}
+  .meta span{border:1px solid var(--line);border-radius:20px;padding:3px 10px}
+  /* status pills */
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.24em .6em;border-radius:20px;white-space:nowrap}
+  .p-solid{background:var(--teal-soft);color:var(--teal)} .p-prelim{background:var(--amber-soft);color:var(--amber)}
+  .p-art{background:var(--rust-soft);color:var(--rust)} .p-queue{background:var(--slate-soft);color:var(--slate)}
+  .dotp{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+  /* at-a-glance */
+  h2{font-size:1.02rem;font-weight:800;letter-spacing:.02em;margin:2.4em 0 .2em;display:flex;align-items:baseline;gap:10px}
+  h2 .rid{font-family:var(--mono);font-size:.72rem;color:var(--coral);font-weight:700}
+  .sub{color:var(--mut);font-size:.9rem;margin:.1em 0 1em}
+  table{border-collapse:collapse;width:100%;font-size:.86rem;margin:2px 0}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  .scroll table{margin:0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  thead th{font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:600;background:var(--panel2)}
+  tbody tr:last-child td{border-bottom:none}
+  td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .good{color:var(--teal);font-weight:700} .bad{color:var(--rust);font-weight:700} .flat{color:var(--faint)}
+  /* result card */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:12px 0}
+  .card .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .card .top h3{font-size:1.12rem;font-weight:800;margin:0;letter-spacing:-.01em}
+  .card p{margin:.5em 0} .card p.take{font-size:1.0rem}
+  .take b{color:var(--coral)}
+  .note{border-left:3px solid var(--line);padding:2px 0 2px 14px;margin:12px 0 0;color:var(--mut);font-size:.88rem}
+  .note.warn{border-color:var(--rust)} .note.warn b{color:var(--rust)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  /* recoverability ladder */
+  .ladder{display:flex;flex-direction:column;gap:5px;margin:6px 0 2px}
+  .lrow{display:grid;grid-template-columns:130px 1fr 46px;align-items:center;gap:10px;font-size:.8rem}
+  .lrow .lb{color:var(--ink);font-family:var(--mono);font-size:.72rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lbar{height:14px;border-radius:4px;position:relative;background:var(--panel2);overflow:hidden}
+  .lbar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;display:block}
+  .lrow .lv{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--mut);font-size:.72rem;text-align:right}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.76rem;color:var(--mut);margin-top:10px}
+  .legend b{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle;margin-right:5px}
+  .foot{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:.78rem;line-height:1.7}
+  .anchor{scroll-margin-top:16px}
+</style>
+<div class="wrap">
+<header>
+  <div class="kicker">AHA · 실험 결과 리뷰</div>
+  <h1>Recoverability: 무엇을 쟀고, 무엇이 버텼나</h1>
+  <p class="lede">Regularizing VLA models by asking hard questions. 각 결과의 <b>실측 수치·통계·정직한 한계</b>를 한 장에.
+     검정 숫자는 mini-VLA(RT-1/fractal, 3 seeds)에서 <em>실제로 측정</em>된 값. 회색/대기 배지는 아직 안 돌린 것.</p>
+  <div class="meta"><span>업데이트 2026-08-02</span><span>mini V-L-A · DINOv2-S + MiniLM + flow BC</span><span>SUBN 4k–16k</span><span>3 seeds · bootstrap CI</span></div>
+</header>
+
+<!-- AT A GLANCE -->
+<h2>한눈에 <span class="rid">status</span></h2>
+<div class="scroll"><table>
+<thead><tr><th>#</th><th>결과</th><th class="n">핵심 수치</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="mono">R1</td><td>측정법이 답을 뒤집는다 (sign-flip)</td><td class="n">linear <span class="bad">+.78</span> vs speed@¼ <span class="good">−.75</span></td><td><span class="pill p-solid"><span class="dotp"></span>SOLID</span></td></tr>
+<tr><td class="mono">R2</td><td>the LAW: recoverability↓ ⇒ gen↑</td><td class="n good">음의 상관</td><td><span class="pill p-solid"><span class="dotp"></span>SOLID</span></td></tr>
+<tr><td class="mono">R3</td><td>composition: mix ≈ 최저-recov 멤버</td><td class="n">min <span class="good">−.87</span> &gt; mean −.57</td><td><span class="pill p-prelim"><span class="dotp"></span>PRELIM</span></td></tr>
+<tr><td class="mono">R3b</td><td>개수-sweep "포화" · 다양성 "inert"</td><td class="n flat">~0.04 (노이즈)</td><td><span class="pill p-art"><span class="dotp"></span>ARTIFACT</span></td></tr>
+<tr><td class="mono">R4</td><td>KI: hard-KI는 action-무관 aux만 굶김</td><td class="n">far-past <span class="bad">−.03</span> vs fut-act <span class="good">+.02</span></td><td><span class="pill p-prelim"><span class="dotp"></span>PRELIM</span></td></tr>
+<tr><td class="mono">R5</td><td>NTP은 형태지 recov 레벨이 아님</td><td class="n flat">개념 + 서베이</td><td><span class="pill p-solid"><span class="dotp"></span>정직</span></td></tr>
+<tr><td class="mono">R6</td><td>state-infer는 측정상 高-recov</td><td class="n bad">+.72 / +.80</td><td><span class="pill p-solid"><span class="dotp"></span>측정됨</span></td></tr>
+<tr><td class="mono">R7</td><td>서베이: ~55 aux가 한 축으로</td><td class="n flat">정성적</td><td><span class="pill p-solid"><span class="dotp"></span>DONE</span></td></tr>
+<tr><td class="mono">NEW</td><td>expert 스택 (FAST-NTP·latent·VQ·dynKI)</td><td class="n flat">GPU 대기</td><td><span class="pill p-queue"><span class="dotp"></span>QUEUED</span></td></tr>
+</tbody></table></div>
+<p class="sub" style="margin-top:10px">SOLID = 3스케일·CI로 재현 · PRELIM = 단일 스케일 proxy · <span style="color:var(--rust)">ARTIFACT = 세팅 결함으로 판명, 정정 실험 진행 중</span> · QUEUED = 코드 준비·검증됨, GPU 대기.</p>
+
+<!-- R1 -->
+<h2 id="r1" class="anchor">측정이 답을 결정한다 <span class="rid">R1 · headline</span></h2>
+<p class="sub">recoverability를 어떤 함수족·어느 시점에 재느냐가 법칙을 보이냐 아니냐를 가른다.</p>
+<div class="card">
+  <div class="top"><h3>The sign-flip</h3><span class="pill p-solid"><span class="dotp"></span>SOLID · 3 scales</span></div>
+  <p class="take">가장 자연스러운 측정기(<b>frozen linear probe</b>)는 법칙의 <b>부호를 뒤집는다</b>. 정책 함수족 + 학습 동역학으로 재야만 법칙이 나온다.</p>
+  <div class="scroll"><table>
+  <thead><tr><th>estimator</th><th>함수족 · 시점</th><th class="n">4k</th><th class="n">8k</th><th class="n">16k</th><th>판정</th></tr></thead>
+  <tbody>
+  <tr><td>linear probe</td><td class="mut">linear · asym</td><td class="n bad">+0.78</td><td class="n bad">+0.69</td><td class="n bad">+0.62</td><td class="bad">뒤집힘</td></tr>
+  <tr><td>MLP probe</td><td class="mut">MLP · asym</td><td class="n flat">+0.03</td><td class="n flat">−0.34</td><td class="n flat">·</td><td class="flat">불안정</td></tr>
+  <tr><td>prequential MDL</td><td class="mut">MLP · dyn</td><td class="n flat">+0.42</td><td class="n flat">−0.05</td><td class="n flat">·</td><td class="flat">불안정</td></tr>
+  <tr><td>end-to-end</td><td class="mut">policy · asym</td><td class="n good">−0.66</td><td class="n good">−0.64</td><td class="n">−0.47</td><td>법칙 (16k서 약화)</td></tr>
+  <tr><td>AULC</td><td class="mut">policy · dyn</td><td class="n good">−0.75</td><td class="n good">−0.67</td><td class="n good">−0.63</td><td class="good">법칙 ✓</td></tr>
+  <tr><td><b>speed@¼</b></td><td class="mut">policy · dyn</td><td class="n good">−0.75</td><td class="n good">−0.72</td><td class="n good">−0.69</td><td class="good">최고 ✓✓</td></tr>
+  </tbody></table></div>
+  <div class="grid2" style="margin-top:12px">
+    <div class="note">Pearson vs OOD 일반화. speed@¼·linear는 <b>세 스케일 모두 CI가 0 제외</b> (linear p≤.018, speed p≤.003). 비대칭(asym) end-to-end는 16k서 유의성 상실(CI[−0.90,+0.34]).</div>
+    <div class="note">선택성 대조: 실제 타깃 mean R_linear <span class="mono">+0.167</span> vs 셔플 타깃 <span class="mono">−0.001</span> → 추정기는 <b>추출</b>을 재지 용량을 재지 않음.</div>
+  </div>
+  <p class="note warn"><b>왜 linear가 뒤집히나:</b> <span class="mono">final-pose</span>는 linear-hard(0.06)인데 deep-easy(0.92) = 전형적 shortcut. 반대로 시각 latent은 linear≈0.2인데 deep≈−0.1이라 grounding을 강제하고 <b>돕는다</b>. linear-decodability ⟂ policy-recoverability.</p>
+</div>
+
+<!-- R2 + ladder -->
+<h2 id="r2" class="anchor">the LAW + recoverability 사다리 <span class="rid">R2</span></h2>
+<p class="sub">객체별로, recoverability가 낮을수록 일반화가 좋다. 아래는 13개 목표의 측정된 recoverability (R_deep, 낮을수록 hard question).</p>
+<div class="card">
+  <div class="ladder" id="ladder"></div>
+  <div class="legend">
+    <span><b style="background:var(--teal)"></b>低-recov = hard question (돕는 쪽)</span>
+    <span><b style="background:var(--coral)"></b>高-recov = shortcut (final-pose 0.96)</span>
+    <span class="mono" style="color:var(--faint)">measured R_deep, fractal 4k</span>
+  </div>
+  <p class="note"><b>the LAW:</b> 위 사다리의 <em>아래쪽</em>(fut-action .04, cur-action .08, 시각 latent ~.15)이 co-train 시 일반화를 올리고, <em>위쪽</em>(final-pose .96)은 공짜로 맞춰져 안 도움.</p>
+</div>
+
+<!-- R3 -->
+<h2 id="r3" class="anchor">composition: 최저 멤버가 지배 <span class="rid">R3</span></h2>
+<div class="card">
+  <div class="top"><h3>mix는 가장 hard한 멤버만큼 일반화한다</h3><span class="pill p-prelim"><span class="dotp"></span>PRELIM · 4k</span></div>
+  <p class="take">12개 mix에서 mix의 일반화를 가장 잘 예측하는 건 <b>최저-recoverability 멤버</b>(min). hard question 하나가 shortcut-투성이 mix를 <b>구제</b>한다.</p>
+  <div class="scroll"><table>
+  <thead><tr><th>요약 통계</th><th class="n">Pearson</th><th class="n">Spearman</th><th>CI 0 제외?</th></tr></thead>
+  <tbody>
+  <tr><td><b>min</b> (가장 hard 멤버)</td><td class="n good">−0.87</td><td class="n good">−0.82</td><td class="good">예 [−0.98,−0.67]</td></tr>
+  <tr><td>joint</td><td class="n">−0.85</td><td class="n">·</td><td class="mut">예</td></tr>
+  <tr><td>mean</td><td class="n flat">·</td><td class="n flat">−0.57</td><td class="flat">아니오 (p=.057)</td></tr>
+  </tbody></table></div>
+  <p class="note"><b>구제 예:</b> <span class="mono">far-past-obs + final-pose</span> (hard 1 + shortcut 1) → gen <span class="mono">−0.033</span> (hard 멤버 근처). vs <span class="mono">final-pose + initial-pose</span> (shortcut 2개) → <span class="mono">−0.062</span>. 설계 규칙: <b>hard question 하나</b>를 넣고 멈춰라.</p>
+</div>
+
+<!-- R3b artifact -->
+<h2 id="r3b" class="anchor">"포화 · 다양성 inert" — 아티팩트로 판명 <span class="rid">R3b</span></h2>
+<div class="card" style="border-color:var(--rust)">
+  <div class="top"><h3>개수 sweep은 세팅 결함이었다</h3><span class="pill p-art"><span class="dotp"></span>ARTIFACT</span></div>
+  <p class="take">저-recov 멤버를 1→6개 쌓아도 benefit이 <b>0.035→0.043→0.043→0.047→0.040→0.045</b>로 전부 노이즈(std~0.018) 안. "포화"로 보였지만 —</p>
+  <p class="note warn"><b>근본 원인:</b> mix가 멤버 타깃의 <b>concat을 하나의 선형 head</b>가 <b>mean-MSE</b>로 예측 + BC:aux 가중치 1:1 고정 → aux가 backbone에 흘리는 <b>gradient 예산이 멤버 수 K와 무관</b>(각 멤버 1/K). 포화가 loss 정규화로 <b>강제</b>돼 있었음. 다양성 패널도 K=2 고정이라 같은 함정.</p>
+  <p class="take" style="margin-top:12px"><b>정정 실험(countfix) 진행 중:</b> 멤버별 <b>독립 head + loss 합산</b>(각 full weight) + <b>총-weight 고정 대조</b>(SUM vs MATCHED vs MEAN). SUM이 K에 따라 오르고 SUM&gt;MATCHED면 → "다양한 hard question이 상보적으로 grounding을 더한다"가 증명됨(≠포화). <span class="mono" style="color:var(--slate)">GPU 대기</span>.</p>
+</div>
+
+<!-- R4 -->
+<h2 id="r4" class="anchor">Knowledge Insulation × action-관련성 <span class="rid">R4</span></h2>
+<div class="card">
+  <div class="top"><h3>hard-KI는 action-무관 aux만 굶긴다</h3><span class="pill p-prelim"><span class="dotp"></span>PRELIM · 4k</span></div>
+  <p class="take">BC head→backbone stop-grad를 앞 τ 비율 동안 켠다. 완전 insulate(τ=1)에서 결과가 <b>action 관련성</b>으로 갈린다.</p>
+  <div class="scroll"><table>
+  <thead><tr><th>backbone-shaping aux</th><th>action-관련?</th><th class="n">τ=0</th><th class="n">τ=0.5</th><th class="n">τ=1 (hard-KI)</th></tr></thead>
+  <tbody>
+  <tr><td>far-past-obs</td><td class="mut">✗</td><td class="n">+0.041</td><td class="n">+0.035</td><td class="n bad">−0.030 굶음</td></tr>
+  <tr><td>cur-action</td><td class="mut">✓</td><td class="n">+0.028</td><td class="n">+0.017</td><td class="n good">+0.024</td></tr>
+  <tr><td>fut-action</td><td class="mut">✓</td><td class="n">+0.021</td><td class="n">+0.011</td><td class="n good">+0.018</td></tr>
+  <tr><td>final-pose</td><td class="mut">~</td><td class="n">+0.012</td><td class="n">+0.009</td><td class="n">+0.028</td></tr>
+  </tbody></table></div>
+  <p class="note">Δ 일반화 vs BC-only. 이게 <b>π0.5의 KI가 안 무너지는 이유</b>를 설명: backbone을 <b>FAST(action-관련)</b>로 shaping하니까. KI+FAST = 암묵적 KI+AHA. (τ=0.5 late-release는 이 스케일서 joint 대비 이득 없었음.)</p>
+</div>
+
+<!-- R5/R6/R7 compact -->
+<h2 id="r567" class="anchor">개념·측정·서베이 <span class="rid">R5 · R6 · R7</span></h2>
+<div class="grid2">
+  <div class="card">
+    <div class="top"><h3>R5 · NTP은 형태다</h3><span class="pill p-solid"><span class="dotp"></span>정직</span></div>
+    <p>NTP라고 다 저-recov가 아님. LLM NTP는 웹텍스트가 高엔트로피라 low-recov지만, <b>π0.5의 subtask NTP는 장면-결정적 저엔트로피</b> → 실제로 <b>高-recov</b>(쉬운 태스크). recoverability = 타깃 엔트로피, 형태 무관.</p>
+  </div>
+  <div class="card">
+    <div class="top"><h3>R6 · state-infer가 반례</h3><span class="pill p-solid"><span class="dotp"></span>측정됨</span></div>
+    <p>proprio를 마스킹하고 이미지+언어로 pose 추론 = 내가 저-recov로 추정했으나 <b>측정하니 高-recov</b>(+0.72/+0.80). 이미지에서 pose가 읽힘. → 정성적 지도를 측정으로 착각하면 안 됨.</p>
+  </div>
+</div>
+<div class="card">
+  <div class="top"><h3>R7 · 필드가 한 축으로</h3><span class="pill p-solid"><span class="dotp"></span>DONE · 정성적</span></div>
+  <p class="take">~55개 선행 VLA aux를 recoverability 축에 배치. <b>필드는 값싼(高-recov) 쪽에 몰려</b> 있다 — MAE/contrastive/VQA·픽셀 next-frame·hindsight-goal 전부 高. 이득은 target 난이도가 아니라 <b>prior 전이·planner 활용</b>에서 옴. <b>retrospective 레인은 거의 비어</b> 있음.</p>
+  <p class="note">경계 판정: inverse-dynamics는 labeler로선 값쌈(H), o_t만이면 hard(L). latent-action Stage-2가 저-recov 신호. hindsight goal은 궤적 위 = 최대 중복(shortcut).</p>
+</div>
+
+<!-- NEW: expert stack -->
+<h2 id="new" class="anchor">새 스택: 실제 VLA 학습 미러링 <span class="rid">2026-08-02 · queued</span></h2>
+<p class="sub">"각 목표를 실제 VLA처럼(FAST/NTP/expert) 구현했을 때 recoverability 축 어디 앉나"를 재려고 만든 모듈. 코드·CPU 스모크 완료, GPU 대기.</p>
+<div class="scroll"><table>
+<thead><tr><th>모듈</th><th>무엇</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="mono">latent_expert</td><td>π0.5-스케일 future-latent expert (action expert처럼). heads: flow · mse · <b>vq</b></td><td><span class="pill p-queue"><span class="dotp"></span>스모크 OK</span></td></tr>
+<tr><td class="mono">token_ntp_expert</td><td>generic NTP — action=공식 <b>FAST</b>(vocab 2048) · text=instruction/subtask. R=1−CE_val/CE_marg</td><td><span class="pill p-queue"><span class="dotp"></span>스모크 OK</span></td></tr>
+<tr><td class="mono">exp2h_dynki</td><td>동적 KI — BC→backbone gradient가 decay하면 SG 자동 해제 (vs fixed τ)</td><td><span class="pill p-queue"><span class="dotp"></span>compile OK</span></td></tr>
+<tr><td class="mono">exp2h_actiontok</td><td>action{연속·FAST-NTP·256bin} + instruction{embed·text-NTP}의 recoverability 측정</td><td><span class="pill p-queue"><span class="dotp"></span>큐 (at_smoke)</span></td></tr>
+<tr><td class="mono">20k dense rollout</td><td>trainable 인코더로 20k ep 학습 → SimplerEnv closed-loop (BC vs AHA)</td><td><span class="pill p-queue"><span class="dotp"></span>큐 (dense_ext)</span></td></tr>
+</tbody></table></div>
+<p class="note">GPU가 사용자 본인 RLT/humanoid 잡으로 포화라 큐 대기 중. 슬롯 나면 감시가 자동 실행 → 결과를 이 페이지·논문에 반영.</p>
+
+<!-- honest bottom line -->
+<h2 id="bottom" class="anchor">정직한 총평 <span class="rid">what stands / what's next</span></h2>
+<div class="card">
+  <p><b class="good">지금 방어 가능:</b> R1(측정·sign-flip, 3스케일+CI)이 앵커. R2 법칙, R3 composition(min), R4 KI 절반(음의 ablation), R7 서베이. 전부 mini-VLA·offline.</p>
+  <p><b style="color:var(--rust)">고쳐야 함:</b> R3b "포화"는 아티팩트 → countfix로 정정 중. R4b FAST-lite(K=16 quantile)는 폐기 → 공식 FAST/OpenVLA-bin NTP로 교체(actiontok).</p>
+  <p><b style="color:var(--amber)">make-or-break (미검증):</b> 외적 타당성 — full-VLA closed-loop(M2). 전부 2.3% 데이터·offline이라 절대 성능 미검증. 20k rollout이 첫 신호.</p>
+</div>
+
+<div class="foot">
+  mini V-L-A: DINOv2-S(학습) + MiniLM(frozen) + state → 2-layer transformer(d=256) → flow-matching BC(15-step chunk) + aux head.
+  RT-1/fractal, OOD = task-cluster held-out, 3 seeds, 10k-bootstrap CI + permutation p.
+  <br>소스: <span class="mono">AHA_MASTER.md</span> · <span class="mono">RECOVERABILITY_MEASUREMENT.md</span> · <span class="mono">M1_RESULTS.md</span> · <span class="mono">CITATIONS_THREATS.md</span> · 라이브 대시보드는 별도.
+</div>
+</div>
+
+<script>
+const LADDER=[
+ ["fut-action",0.04],["cur-action",0.08],["far-fut-obs",0.14],["final-obs",0.15],
+ ["far-past-obs",0.16],["near-past-obs",0.18],["near-fut-obs",0.19],["prev-action",0.21],
+ ["initial-obs",0.22],["initial-pose",0.30],["fut-gripper",0.40],["displacement",0.49],["final-pose",0.96]
+];
+function mix(a,b,t){a=a.match(/\w\w/g).map(x=>parseInt(x,16));b=b.match(/\w\w/g).map(x=>parseInt(x,16));
+ return '#'+a.map((v,i)=>Math.round(v+(b[i]-v)*t).toString(16).padStart(2,'0')).join('');}
+const el=document.getElementById('ladder');
+const teal='4F958B',coral='CF6F53';
+for(const [name,r] of LADDER){
+ const t=Math.min(1,r/0.6); const col=mix(teal,coral,t);
+ const row=document.createElement('div');row.className='lrow';
+ row.innerHTML=`<div class="lb">${name}</div><div class="lbar"><i style="width:${Math.max(3,r*100)}%;background:${col}"></i></div><div class="lv">${r.toFixed(2)}</div>`;
+ el.appendChild(row);
+}
+</script>
