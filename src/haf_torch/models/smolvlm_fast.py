@@ -25,12 +25,14 @@ from .config import HAFTorchConfig
 IMAGENET_MEAN = None  # SigLIP path uses [-1,1], not ImageNet stats
 
 
-def resize_with_pad(img: torch.Tensor, h: int, w: int, pad_value: float = 0.0) -> torch.Tensor:
-    """Aspect-preserving resize + pad (SmolVLA convention: pad on left/top). img: [B,3,H,W] float."""
+def resize_with_pad(img: torch.Tensor, h: int, w: int, pad_value: float = 0.0, mode: str = "bicubic") -> torch.Tensor:
+    """Aspect-preserving resize + pad (SmolVLA convention: pad on left/top). img: [B,3,H,W] float.
+    bicubic+antialias is the closest GPU kernel to the processor's PIL LANCZOS (max err 21 vs 50 for bilinear);
+    LANCZOS itself is PIL-only (torchvision raises NotImplementedError on tensors)."""
     b, c, ih, iw = img.shape
     r = min(h / ih, w / iw)
     nh, nw = max(1, int(round(ih * r))), max(1, int(round(iw * r)))
-    x = F.interpolate(img, size=(nh, nw), mode="bilinear", align_corners=False)
+    x = F.interpolate(img, size=(nh, nw), mode=mode, align_corners=False, antialias=True)
     out = img.new_full((b, c, h, w), pad_value)
     out[:, :, h - nh:, w - nw:] = x
     return out
@@ -120,7 +122,7 @@ class SmolVLMFastVLA(nn.Module):
     def encode_images(self, images_u8: torch.Tensor) -> torch.Tensor:
         """images_u8: [B,H,W,3] uint8 on GPU -> [B, 64, width] visual tokens."""
         x = images_u8.permute(0, 3, 1, 2).float() / 255.0
-        x = resize_with_pad(x, self.cfg.vlm_image_size, self.cfg.vlm_image_size)
+        x = resize_with_pad(x, self.cfg.vlm_image_size, self.cfg.vlm_image_size, mode=self.cfg.resize_mode)
         x = (x * 2.0 - 1.0).to(next(self.connector.parameters()).dtype)      # SigLIP expects [-1,1]
         if self.cfg.freeze_vision:
             with torch.no_grad():

@@ -11,7 +11,8 @@ class HAFTorchConfig:
     freeze_vision: bool = False            # pi0.5/LAP train the vision tower too (SmolVLA freezes it)
     # SmolVLM/Idefics3 tiles each image (~17 tiles => ~1139 tokens => OOM). One robot view is enough.
     image_splitting: bool = False
-    vlm_image_size: int = 384              # tile longest edge fed to the VLM                    # False = fine-tune the pretrained VLM (the real-VLA regime)
+    vlm_image_size: int = 512              # SmolVLM native tile size (512 -> 64 visual tokens)
+    resize_mode: str = "bicubic"           # GPU resize kernel (LANCZOS is PIL-only); antialias on                    # False = fine-tune the pretrained VLM (the real-VLA regime)
 
     # action space (RT-1/fractal defaults)
     action_dim: int = 7
@@ -51,7 +52,7 @@ class HAFTorchConfig:
     seed: int = 0
 
     # data
-    image_size: int = 224
+    image_size: int = 0                    # 0 = keep native fractal frames (256x320); GPU resizes once
     prompt_prefix: str = ""                     # optional instruction prefix
 
     def describe(self) -> str:
